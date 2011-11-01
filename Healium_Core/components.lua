@@ -1171,13 +1171,13 @@ healiumEventHandler:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
 
 	if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
 		self:UnregisterEvent("ADDON_LOADED")
-		local version = GetAddOnMetadata(ADDON_NAME, "version")
-		if version then
-			Message(string.format(L.GREETING_VERSION, tostring(version)))
-		else
-			Message(L.GREETING_VERSIONUNKNOWN)
-		end
-		Message(L.GREETING_OPTIONS)
+		-- local version = GetAddOnMetadata(ADDON_NAME, "version")
+		-- if version then
+			-- Message(string.format(L.GREETING_VERSION, tostring(version)))
+		-- else
+			-- Message(L.GREETING_VERSIONUNKNOWN)
+		-- end
+		-- Message(L.GREETING_OPTIONS)
 		InitializeSettings()
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		GetSpecSettings()
@@ -1264,7 +1264,7 @@ end
 -------------------------------------------------------
 function H:DumpInformation(onlyShown)
 	local infos = {}
-	infos.Version = GetAddOnMetadata(ADDON_NAME, "version")
+	infos.LibVersion = GetAddOnMetadata(ADDON_NAME, "version")
 	infos.PerformanceCounter = PerformanceCounter:Get(ADDON_NAME)
 	infos.Units = {}
 	ForEachUnitframeEvenIfInvalid(

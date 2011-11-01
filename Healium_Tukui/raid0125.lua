@@ -1,3 +1,5 @@
+local ADDON_NAME, _ = ...
+
 local H, HC = unpack(HealiumCore)
 
 -- Get oUF
@@ -266,7 +268,7 @@ end
 -- Slash commands
 -------------------------------------------------------
 local function Message(...)
-	print("Tukui_Healium:", ...)
+	print("Healium_Tukui:", ...)
 end
 
 local function ToggleHeader(header)
@@ -281,19 +283,21 @@ local function ToggleHeader(header)
 	end
 end
 
+SLASH_HLMT1 = "/ht"
+SLASH_HLMT2 = "/hlmt"
 local LastPerformanceCounterReset = GetTime()
 local function SlashHandlerShowHelp()
-	Message(string.format(L.healium_CONSOLE_HELP_GENERAL, SLASH_THLM1, SLASH_THLM2))
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPGENERAL)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPFULL)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPUNIT)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPPERF)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPSHOW)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_RESETPERF)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_TOGGLE)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_NAMELISTADD)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_NAMELISTREMOVE)
-	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_NAMELISTCLEAR)
+	Message(string.format(L.healium_CONSOLE_HELP_GENERAL, SLASH_HLMT1, SLASH_HLMT2))
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_DUMPGENERAL)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_DUMPFULL)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_DUMPUNIT)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_DUMPPERF)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_DUMPSHOW)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_RESETPERF)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_TOGGLE)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_NAMELISTADD)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_NAMELISTREMOVE)
+	Message(SLASH_HLMT1..L.healium_CONSOLE_HELP_NAMELISTCLEAR)
 end
 
 local function SlashHandlerDump(args)
@@ -460,10 +464,7 @@ local function SlashHandlerNamelist(cmd)
 	end
 end
 
-
-SLASH_THLM1 = "/th"
-SLASH_THLM2 = "/thlm"
-SlashCmdList["THLM"] = function(cmd)
+SlashCmdList["HLMT"] = function(cmd)
 	local switch = cmd:match("([^ ]+)")
 	local args = cmd:match("[^ ]+ (.+)")
 	if switch == "dump" then
@@ -571,27 +572,39 @@ end
 -------------------------------------------------------
 local eventHandlers = CreateFrame("Frame")
 eventHandlers:RegisterEvent("PLAYER_LOGIN")
-eventHandlers:SetScript("OnEvent", function(self)
-	-- Set tooltip anchor
-	HC.general.buttonTooltipAnchor = _G["TukuiTooltipAnchor"] -- change button tooltip anchor
-
-	-- Kill blizzard raid frames
-	local dummy = function() return end
-	local function Kill(object)
-		if object.UnregisterAllEvents then
-			object:UnregisterAllEvents()
+eventHandlers:RegisterEvent("ADDON_LOADED")
+eventHandlers:SetScript("OnEvent", function(self, event, arg1)
+	if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
+		local version = GetAddOnMetadata(ADDON_NAME, "version")
+		local libVersion = GetAddOnMetadata("Healium_Core", "version")
+		if version and libVersion then
+			Message(string.format(L.healium_GREETING_VERSION, tostring(version), tostring(libVersion)))
+		else
+			Message(L.healium_GREETING_VERSIONUNKNOWN)
 		end
-		object.Show = dummy
-		object:Hide()
+		Message(L.healium_GREETING_OPTIONS)
+	elseif event == "PLAYER_LOGIN" then
+		-- Set tooltip anchor
+		HC.general.buttonTooltipAnchor = _G["TukuiTooltipAnchor"] -- change button tooltip anchor
+
+		-- Kill blizzard raid frames
+		local dummy = function() return end
+		local function Kill(object)
+			if object.UnregisterAllEvents then
+				object:UnregisterAllEvents()
+			end
+			object.Show = dummy
+			object:Hide()
+		end
+		InterfaceOptionsFrameCategoriesButton10:SetScale(0.00001)
+		InterfaceOptionsFrameCategoriesButton10:SetAlpha(0)
+		InterfaceOptionsFrameCategoriesButton11:SetScale(0.00001)
+		InterfaceOptionsFrameCategoriesButton11:SetAlpha(0)
+		Kill(CompactRaidFrameManager)
+		Kill(CompactRaidFrameContainer)
+		CompactUnitFrame_UpateVisible = dummy
+		CompactUnitFrame_UpdateAll = dummy
 	end
-	InterfaceOptionsFrameCategoriesButton10:SetScale(0.00001)
-	InterfaceOptionsFrameCategoriesButton10:SetAlpha(0)
-	InterfaceOptionsFrameCategoriesButton11:SetScale(0.00001)
-	InterfaceOptionsFrameCategoriesButton11:SetAlpha(0)
-	Kill(CompactRaidFrameManager)
-	Kill(CompactRaidFrameContainer)
-	CompactUnitFrame_UpateVisible = dummy
-	CompactUnitFrame_UpdateAll = dummy
 end)
 
 -- Spawn headers

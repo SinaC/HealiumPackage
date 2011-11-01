@@ -1,6 +1,11 @@
 local T, C, L = unpack(Tukui) -- Import: T - functions, constants, variables; C - config; L - locales
 
 L.healium_NOTINCOMBAT = "Not while in combat"
+
+L.healium_GREETING_VERSIONUNKNOWN = "Unknown version"
+L.healium_GREETING_VERSION = "Version %s (core version %s)"
+L.healium_GREETING_OPTIONS = "Use /ht or /hlmt for in-game options"
+
 L.healium_CONSOLE_HELP_GENERAL =     "Commands for %s or %s"
 L.healium_CONSOLE_HELP_DUMPGENERAL = " dump - dump only visible healium frames"
 L.healium_CONSOLE_HELP_DUMPFULL =    " dump full - dump every healium frames"

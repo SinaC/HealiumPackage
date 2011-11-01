@@ -11,9 +11,6 @@ if H.client == "frFR" then
 	L.TOOLTIP_TARGET = "Cible: |cFF00FF00%s|r"
 	L.BUFFDEBUFF_TOOMANYBUFF = "Trop d'am\195\169liorations sur %s %s"
 	L.BUFFDEBUFF_TOOMANYDEBUFF = "Trop d'affaiblissements sur %s %s"
-	L.GREETING_VERSIONUNKNOWN = "Num\195\169ro de version non-disponible"
-	L.GREETING_VERSION = "Version %s"
-	L.GREETING_OPTIONS = "Utilisez /th pour obtenir une liste des commandes"
 	L.SETTINGS_UNKNOWNBUFFDEBUFF = "SpellID %d inconnu dans %s"
 	L.SETTINGS_DUPLICATEBUFFDEBUFF = "SpellID %d et %d sont le m\195\170me buff/debuff (%s) dans %s"
 end

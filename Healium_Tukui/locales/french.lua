@@ -2,6 +2,11 @@ local T, C, L = unpack(Tukui) -- Import: T - functions, constants, variables; C 
 
 if GetLocale() == "frFR" then
 	L.healium_NOTINCOMBAT = "Impossible en combat"
+
+	L.healium_GREETING_VERSIONUNKNOWN = "Num\195\169ro de version non-disponible"
+	L.healium_GREETING_VERSION = "Version %s (core version %s)"
+	L.healium_GREETING_OPTIONS = "Utilisez /ht ou /hlmt pour obtenir une liste des commandes"
+
 	L.healium_CONSOLE_HELP_GENERAL =        "Commandes pour %s or %s"
 	L.healium_CONSOLE_HELP_DUMPGENERAL =    " dump - affiche les informations \195\160 propos des fen\195\170tres Healium visible"
 	L.healium_CONSOLE_HELP_DUMPFULL =       " dump full - affiche les informations \195\160 propos des toutes les fen\195\170tres Healium"
