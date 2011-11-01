@@ -1,0 +1,1 @@
+Version 1.0Main functionality addedTODOuse DisableHealium/EnableHealiumtest console commandsmemory usage: memory seems to grow without any reason -> check anonymous function in loop, array creation, ...

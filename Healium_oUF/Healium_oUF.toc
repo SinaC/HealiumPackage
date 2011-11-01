@@ -1,0 +1,1 @@
+## Interface: 40200## Version: 1.0## Author: SinaC## Title: Healium for oUF## Credits: Tukz, Engypoo## Notes: oUF with Healium components## URL: https://github.com/SinaC/Healium_oUF## RequiredDeps: oUF, Healium_ComponentsHealium_oUF.xml
