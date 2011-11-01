@@ -12,6 +12,11 @@ if H.myname == "Yoog" then
 	C["SHAMAN"][3].spells[5].spellID = nil
 	--C["SHAMAN"][3].spells[5].macroName = "NSHW" -- Nature Swiftness + Greater Healing Wave
 	C["SHAMAN"][3].spells[5].macroName = "TEST" -- TEST
+
+	C["SHAMAN"][1] = {}
+	C["SHAMAN"][1].spells = {
+		{ macroName = "TEST" }
+	}
 end
 
 if H.myclass == "HUNTER" then

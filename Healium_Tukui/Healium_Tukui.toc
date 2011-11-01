@@ -1,1 +1,1 @@
-## Interface: 40200## Version: 1.0## Author: SinaC## Title: Healium for Tukui## Credits: Tukz, Engypoo## Notes: Tukui with Healium components## URL: https://github.com/SinaC/Healium_Tukui## RequiredDeps: Tukui,Healium_ComponentsHealium_Tukui.xml
+## Interface: 40200## Version: 1.1## Author: SinaC## Title: Healium for Tukui## Credits: Tukz, Engypoo## Notes: Tukui with Healium components## URL: https://github.com/SinaC/Healium_Tukui## RequiredDeps: Tukui,Healium_ComponentsHealium_Tukui.xml

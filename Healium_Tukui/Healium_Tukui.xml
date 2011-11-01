@@ -2,7 +2,7 @@
 	<Script file="config.lua"/>
 	<Script file="locales\english.lua"/>
 	<Script file="locales\french.lua"/>
-	<Script file="DumpSack.lua"/>
+	<Script file="dumpsack.lua"/>
 	<Script file="raid0125.lua"/>
 	<Script file="oUF_hTukz_Raid26_40.lua"/>
 </Ui>

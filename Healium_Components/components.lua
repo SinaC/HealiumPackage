@@ -105,13 +105,36 @@ end
 -------------------------------------------------------
 -- Settings
 -------------------------------------------------------
+-- Check spell settings
+local function CheckSpellSettings()
+	--DEBUG(1000,"CheckSpellSettings")
+	-- Check settings
+	if SpecSettings then
+		for _, spellSetting in ipairs(SpecSettings.spells) do
+			--DEBUG(1,"CheckSpellSettings:"..tostring(spellSetting.spellID).."  "..tostring(spellSetting.macroName))
+			if spellSetting.spellID and not IsSpellLearned(spellSetting.spellID) then
+				local name = GetSpellInfo(spellSetting.spellID)
+				if name then
+					ERROR(string.format(L.CHECKSPELL_SPELLNOTLEARNED, name, spellSetting.spellID))
+				else
+					ERROR(string.format(L.CHECKSPELL_SPELLNOTEXISTS, spellSetting.spellID))
+				end
+			elseif spellSetting.macroName and GetMacroIndexByName(spellSetting.macroName) == 0 then
+				ERROR(string.format(L.CHECKSPELL_MACRONOTFOUND, spellSetting.macroName))
+			end
+		end
+	end
+end
+
 -- Get settings for current spec and assign it to SpecSettings (if not already set)
 local function GetSpecSettings()
 	if SpecSettings then return end
 	if not C[H.myclass] then return end
 	local ptt = GetPrimaryTalentTree()
 	if not ptt then return end
+	--DEBUG(1, "GetSpecSettings done:"..ptt)
 	SpecSettings = C[H.myclass][ptt]
+	--CheckSpellSettings()
 end
 
 local function ResetSpecSettings()
@@ -846,12 +869,12 @@ local function UpdateFrameButtonsAttributes(frame)
 					name, _, icon = GetSpellInfo(spellSetting.spellID)
 					button.hSpellBookID = GetSpellBookID(name)
 					button.hMacroName = nil
-				else
-					if spellSetting.spellName then
-						ERROR(string.format(L.CHECKSPELL_SPELLNOTLEARNED, name, spellSetting.spellID))
-					else
-						ERROR(string.format(L.CHECKSPELL_SPELLNOTEXISTS, spellSetting.spellID))
-					end
+				-- else
+					-- if spellSetting.spellName then
+						-- ERROR(string.format(L.CHECKSPELL_SPELLNOTLEARNED, name, spellSetting.spellID))
+					-- else
+						-- ERROR(string.format(L.CHECKSPELL_SPELLNOTEXISTS, spellSetting.spellID))
+					-- end
 				end
 			elseif spellSetting.macroName then
 				if GetMacroIndexByName(spellSetting.macroName) > 0 then
@@ -860,8 +883,8 @@ local function UpdateFrameButtonsAttributes(frame)
 					name = spellSetting.macroName
 					button.hSpellBookID = nil
 					button.hMacroName = name
-				else
-					ERROR(string.format(L.CHECKSPELL_MACRONOTFOUND, spellSetting.macroName))
+				-- else
+					-- ERROR(string.format(L.CHECKSPELL_MACRONOTFOUND, spellSetting.macroName))
 				end
 			end
 			if type and name and icon then
@@ -1137,9 +1160,9 @@ healiumEventHandler:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 healiumEventHandler:RegisterEvent("UNIT_AURA")
 healiumEventHandler:RegisterEvent("UNIT_POWER")
 healiumEventHandler:RegisterEvent("UNIT_MAXPOWER")
---healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_SENT")
---healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
---healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_SENT")
+healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 healiumEventHandler:RegisterEvent("UNIT_HEALTH_FREQUENT")
 healiumEventHandler:RegisterEvent("UNIT_CONNECTION")
 healiumEventHandler:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
@@ -1156,7 +1179,13 @@ healiumEventHandler:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
 		end
 		Message(L.GREETING_OPTIONS)
 		InitializeSettings()
-	elseif event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+	elseif event == "PLAYER_ENTERING_WORLD" then
+		GetSpecSettings()
+		CheckSpellSettings()
+		ForEachUnitframe(UpdateFrameButtonsAttributes)
+		ForEachUnitframe(UpdateFrameDebuffsPosition)
+		ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+	elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
 		GetSpecSettings()
 		ForEachUnitframe(UpdateFrameButtonsAttributes)
 		ForEachUnitframe(UpdateFrameDebuffsPosition)
@@ -1169,26 +1198,32 @@ healiumEventHandler:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
 			ForEachUnitframe(UpdateFrameDebuffsPosition)
 			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
 		end
-	-- elseif event == "UNIT_SPELLCAST_SENT" and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
-		-- self.hRespecing = 1 -- respec started
-	-- elseif (event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_SUCCEEDED") and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
-		-- self.hRespecing = nil --> respec stopped
+	elseif event == "UNIT_SPELLCAST_SENT" and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
+		--DEBUG(1, "Respec started")
+		self.hRespecing = 1 -- respec started
+	elseif (event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_SUCCEEDED") and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
+		--DEBUG(1, "Respec stopped")
+		self.hRespecing = nil --> respec stopped
 	elseif event == "PLAYER_TALENT_UPDATE" then
-		ResetSpecSettings()
-		-- if self.hRespecing == 2 then -- respec finished
-			-- local SpecSettings = GetSpecSettings()
-			-- ForEachUnitframe(UpdateFrameButtonsAttributes, SpecSettings)
-			-- ForEachUnitframe(UpdateFrameDebuffsPosition, SpecSettings)
-			-- ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs, SpecSettings)
-			-- self.hRespecing = nil -- no respec running
-		-- elseif self.hRespecing == 1 then -- respec not yet finished
-			-- self.hRespecing = 2 -- respec finished
-		-- else -- respec = nil, not respecing (called while connecting)
-		GetSpecSettings()
-		ForEachUnitframe(UpdateFrameButtonsAttributes)
-		ForEachUnitframe(UpdateFrameDebuffsPosition)
-		ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
-		-- end
+		if self.hRespecing == 2 then -- respec finished
+			--DEBUG(1, "Respec finished")
+			ResetSpecSettings()
+			GetSpecSettings()
+			CheckSpellSettings()
+			ForEachUnitframe(UpdateFrameButtonsAttributes, SpecSettings)
+			ForEachUnitframe(UpdateFrameDebuffsPosition, SpecSettings)
+			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs, SpecSettings)
+			self.hRespecing = nil -- no respec running
+		elseif self.hRespecing == 1 then -- respec not yet finished
+			--DEBUG(1, "Respec not yet finished")
+			self.hRespecing = 2 -- respec finished
+		else -- respec = nil, not respecing (called while connecting)
+			--DEBUG(1, "no Respec")
+			GetSpecSettings()
+			ForEachUnitframe(UpdateFrameButtonsAttributes)
+			ForEachUnitframe(UpdateFrameDebuffsPosition)
+			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+		end
 	elseif event == "SPELL_UPDATE_COOLDOWN" then
 		GetSpecSettings()
 		if SpecSettings then UpdateCooldowns() end
@@ -1227,13 +1262,14 @@ end
 -------------------------------------------------------
 -- Dump
 -------------------------------------------------------
-function H:DumpInformation()
+function H:DumpInformation(onlyShown)
 	local infos = {}
 	infos.Version = GetAddOnMetadata(ADDON_NAME, "version")
 	infos.PerformanceCounter = PerformanceCounter:Get(ADDON_NAME)
 	infos.Units = {}
 	ForEachUnitframeEvenIfInvalid(
 		function (frame)
+			if onlyShown == true and not frame:IsShown() then return end
 			infos.Units[frame:GetName()] = {}
 			local unitInfo = infos.Units[frame:GetName()]
 			unitInfo.Unit = frame.unit
@@ -1242,37 +1278,43 @@ function H:DumpInformation()
 			unitInfo.Buttons = {}
 			for i = 1, C.general.maxButtonCount, 1 do
 				local button = frame.hButtons[i]
-				unitInfo.Buttons[i] = {}
-				local buttonInfo = unitInfo.Buttons[i]
-				buttonInfo.Texture = button.icon and button.icon:GetTexture() or nil
-				buttonInfo.IsShown = button:IsShown()
-				buttonInfo.SpellID = button.hSpellBookID
-				buttonInfo.MacroName = button.hMacroName
-				buttonInfo.OOM = button.hOOM
-				buttonInfo.NotUsable = button.hNotUsable
-				buttonInfo.DispelHighlight = button.hDispelHighlight
-				buttonInfo.OOR = button.hOOR
-				buttonInfo.Invalid = button.hInvalid
+				if not onlyShown or button:IsShown() then
+					unitInfo.Buttons[i] = {}
+					local buttonInfo = unitInfo.Buttons[i]
+					buttonInfo.Texture = button.texture and button.texture:GetTexture() or nil
+					buttonInfo.IsShown = button:IsShown()
+					buttonInfo.SpellID = button.hSpellBookID
+					buttonInfo.MacroName = button.hMacroName
+					buttonInfo.OOM = button.hOOM
+					buttonInfo.NotUsable = button.hNotUsable
+					buttonInfo.DispelHighlight = button.hDispelHighlight
+					buttonInfo.OOR = button.hOOR
+					buttonInfo.Invalid = button.hInvalid
+				end
 			end
 			unitInfo.Buffs = {}
 			for i = 1, C.general.maxBuffCount, 1 do
 				local buff = frame.hBuffs[i]
-				unitInfo.Buffs[i] = {}
-				local buffInfo = unitInfo.Buffs[i]
-				buffInfo.IsShown = buff:IsShown()
-				buffInfo.Texture = buff.texture and buff.texture:GetTexture() or nil
-				buffInfo.Count = buff.count:GetText()
-				buffInfo.ID = buff:GetID()
+				if not onlyShown or buff:IsShown() then
+					unitInfo.Buffs[i] = {}
+					local buffInfo = unitInfo.Buffs[i]
+					buffInfo.IsShown = buff:IsShown()
+					buffInfo.Icon = buff.icon and buff.icon:GetTexture() or nil
+					buffInfo.Count = buff.count:GetText()
+					buffInfo.ID = buff:GetID()
+				end
 			end
 			unitInfo.Debuffs = {}
 			for i = 1, C.general.maxDebuffCount, 1 do
 				local debuff = frame.hDebuffs[i]
-				unitInfo.Debuffs[i] = {}
-				local debuffInfo = unitInfo.Debuffs[i]
-				debuffInfo.IsShown = debuff:IsShown()
-				debuffInfo.Texture = debuff.texture and debuff.texture:GetTexture() or nil
-				debuffInfo.Count = debuff.count:GetText()
-				debuffInfo.ID = debuff:GetID()
+				if not onlyShown or debuff:IsShown() then
+					unitInfo.Debuffs[i] = {}
+					local debuffInfo = unitInfo.Debuffs[i]
+					debuffInfo.IsShown = debuff:IsShown()
+					debuffInfo.Icon = debuff.icon and debuff.icon:GetTexture() or nil
+					debuffInfo.Count = debuff.count:GetText()
+					debuffInfo.ID = debuff:GetID()
+				end
 			end
 		end
 	)

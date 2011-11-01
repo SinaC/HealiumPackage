@@ -276,10 +276,15 @@ end
 
 -- Slash commands
 -------------------------------------------------------
+local function Message(...)
+	print("Tukui_Healium:", ...)
+end
+
 local LastPerformanceCounterReset = GetTime()
 local function SlashHandlerShowHelp()
 	Message(string.format(L.healium_CONSOLE_HELP_GENERAL, SLASH_THLM1, SLASH_THLM2))
 	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPGENERAL)
+	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPFULL)
 	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPUNIT)
 	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPPERF)
 	Message(SLASH_THLM1..L.healium_CONSOLE_HELP_DUMPSHOW)
@@ -291,32 +296,48 @@ local function SlashHandlerShowHelp()
 end
 
 local function SlashHandlerDump(args)
+	local function CountEntry(t)
+		local count = 0
+		for k, v in pairs(t) do
+			count = count + 1
+		end
+		return count
+	end
 	local function Dump(level, k, v)
-		if type(t) == "table" then
-			if k then
-				DumpSack:Add(tostring(k))
-			end
-			for key, value in pairs(t) do
-				Dump(level+1, key, value)
+		local pad = ""
+		for i = 1, level, 1 do
+			pad = pad .. "  "
+		end
+		if type(v) == "table" then
+			local count = CountEntry(v)
+			if count > 0 then
+				if k then
+					DumpSack:Add(pad..tostring(k))
+				end
+				for key, value in pairs(v) do
+					Dump(level+1, key, value)
+				end
 			end
 		else
-			local pad = ""
-			for i = 1, level, 1 do
-				pad = pad .. "  "
-			end
-			DumpSack:Add(pad..tostring(k).."="..tostring(t))
+			DumpSack:Add(pad..tostring(k).."="..tostring(v))
 		end
 	end
 	if not args then
-		local infos = H:DumpInformation()
+		local infos = H:DumpInformation(true)
+		if infos then
+			Dump(0, nil, infos)
+			DumpSack:Flush("Healium_Tukui")
+		end
+	elseif args == "full" then
+		local infos = H:DumpInformation(false)
 		if infos then
 			Dump(0, nil, infos)
 			DumpSack:Flush("Healium_Tukui")
 		end
 	elseif args == "perf" then
-		local infos = H:DumpInformation()
-		if info and infos.PerformanceCounter then
-			Dump(0, nil, infos.PerformanceCounter)
+		local infos = PerformanceCounter:Get("Healium_Components")
+		if info then
+			Dump(0, nil, infos)
 			DumpSack:Flush("Healium_Tukui")
 		end
 	elseif args == "show" then

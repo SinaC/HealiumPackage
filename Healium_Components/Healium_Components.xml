@@ -1,10 +1,10 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
 	<Script file="init.lua"/>
 
+	<Script file="constants.lua"/>
+
 	<Script file="locales\english.lua"/>
 	<Script file="locales\french.lua"/>
-
-	<Script file="constants.lua"/>
 
 	<Script file="debug\PerformanceCounter.lua"/>
 

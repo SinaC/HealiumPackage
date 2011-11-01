@@ -24,7 +24,7 @@ function PerformanceCounter:Increment(addonName, fctName)
 	end
 	local entry = addonSection[fctName]
 	if not entry then
-		addonSection[fctName] = { count = 1, lastTime = GetTime() }
+		addonSection[fctName] = {count = 1, lastTime = GetTime()}
 	else
 		local cnt = (entry.count or 0) + 1
 		local diff = currentTime - (entry.lastTime or currentTime)
@@ -34,7 +34,7 @@ function PerformanceCounter:Increment(addonName, fctName)
 		if diff > highestDiff then highestDiff = diff end
 		addonSection[fctName].count = cnt
 		addonSection[fctName].lastTime = currentTime
-		addonSection[fctName].lowestSpan = lowerDiff
+		addonSection[fctName].lowestSpan = lowestDiff
 		addonSection[fctName].highestSpan = highestDiff
 	end
 end
@@ -46,13 +46,14 @@ function PerformanceCounter:Get(addonName, fctName)
 	if not fctName then
 		local list = {} -- make a copy to avoid caller modifying counters
 		for key, value in pairs(addonEntry) do
-			list[key] = { count = value.count, lastTime = value.lastTime, lowestSpan = value.lowestSpan, highestSpan = value.highestSpan }
+			--print(key.."->"..tostring(value.count).."  "..tostring(value.lastTime).."  "..tostring(value.lowestSpan).."  "..tostring(value.highestSpan))
+			list[key] = {count = value.count, lastTime = value.lastTime, lowestSpan = value.lowestSpan, highestSpan = value.highestSpan}
 		end
 		return list
 	else
 		local entry = addonEntry[fctName]
 		if entry then
-			return { count = entry.count, lastTime = entry.lastTime, lowestSpan = entry.lowestSpan, highestSpan = entry.highestSpan }
+			return {count = entry.count, lastTime = entry.lastTime, lowestSpan = entry.lowestSpan, highestSpan = entry.highestSpan}
 		else
 			return nil
 		end
