@@ -30,6 +30,8 @@ if GetLocale() == "frFR" then
 
 	L.healium_TAB_TITLE = "Menu Healium"
 	L.healium_TAB_TOOLTIP = "Healium: cliquer pour les options"
+	L.healium_TAB_PLAYERFRAMESHOW = "Afficher la fen\195\170tre de raid"
+	L.healium_TAB_PLAYERFRAMEHIDE = "Cacher la fen\195\170tre de raid"
 	L.healium_TAB_TANKFRAMESHOW = "Afficher la fen\195\170tre des tanks"
 	L.healium_TAB_TANKFRAMEHIDE = "Cacher la fen\195\170tre des tanks"
 	L.healium_TAB_PETFRAMESHOW = "Afficher la fen\195\170tre des familiers"

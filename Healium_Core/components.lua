@@ -42,15 +42,15 @@ local SpecSettings = nil
 -- Helpers
 -------------------------------------------------------
 local function Message(...)
-	print("Healium_Components:", ...)
+	print("HealiumCore:", ...)
 end
 
 local function ERROR(...)
-	print("|CFFFF0000Healium_Components|r:",...)
+	print("|CFFFF0000HealiumCore|r:",...)
 end
 
 local function WARNING(...)
-	print("|CFF00FFFFHealium_Components|r:",...)
+	print("|CFF00FFFFHealiumCore|r:",...)
 end
 
 local function DEBUG(lvl, ...)

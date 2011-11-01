@@ -4,6 +4,7 @@ C["healium"] = {
 	unitframeWidth = 120,
 	unitframeHeight = 28,
 
+	showTab = true,
 	showTanks = true,
 	showPets = true,
 	showNamelist = true,

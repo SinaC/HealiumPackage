@@ -1,9 +1,0 @@
-## Interface: 40200
-## Version: 1.1
-## Author: SinaC
-## Title: Healium Components
-## Credits: Engypoo
-## Notes: Healium components
-## URL: https://github.com/SinaC/Healium_Components
-
-Healium_Components.xml

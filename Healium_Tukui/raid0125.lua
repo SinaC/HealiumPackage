@@ -1,7 +1,4 @@
-local H, HC = unpack(HealiumComponents)
-
--- Get Performance Counter
-local PerformanceCounter = H.PerformanceCounter
+local H, HC = unpack(HealiumCore)
 
 -- Get oUF
 local oUF = oUFTukui or oUF
@@ -12,6 +9,16 @@ if not oUF then return end -- No need to continue if oUF is not found
 local T, C, L = unpack(Tukui)
 -- Check Tukui config for raidframes
 if not C["unitframes"].enable == true or C["unitframes"].gridonly == true then return end -- No need to continue if unitframes are not displayed or grid mode
+
+-- Aliases
+local PerformanceCounter = H.PerformanceCounter
+local TabMenu = _G["Tukui_TabMenu"]
+
+-- Raid frame headers
+local PlayerRaidHeader = nil
+local PetRaidHeader = nil
+local TankRaidHeader = nil
+local NamelistRaidHeader = nil
 
 -- Skin Healium Buttons/Buff/Debuffs
 ------------------------------------
@@ -256,11 +263,11 @@ local function Shared(self, unit)
 	return self
 end
 
--- Raid unitframes header
-local PlayerRaidHeader = nil
-local PetRaidHeader = nil
-local TankRaidHeader = nil
-local NamelistRaidHeader = nil
+-- Slash commands
+-------------------------------------------------------
+local function Message(...)
+	print("Tukui_Healium:", ...)
+end
 
 local function ToggleHeader(header)
 	if not header then return end
@@ -272,12 +279,6 @@ local function ToggleHeader(header)
 		RegisterAttributeDriver(header, "state-visiblity", header.hVisibilityAttribute)
 		header:Show()
 	end
-end
-
--- Slash commands
--------------------------------------------------------
-local function Message(...)
-	print("Tukui_Healium:", ...)
 end
 
 local LastPerformanceCounterReset = GetTime()
@@ -335,7 +336,7 @@ local function SlashHandlerDump(args)
 			DumpSack:Flush("Healium_Tukui")
 		end
 	elseif args == "perf" then
-		local infos = PerformanceCounter:Get("Healium_Components")
+		local infos = PerformanceCounter:Get("Healium_Core")
 		if info then
 			Dump(0, nil, infos)
 			DumpSack:Flush("Healium_Tukui")
@@ -363,7 +364,7 @@ end
 
 local function SlashHandlerReset(args)
 	if args == "perf" then
-		PerformanceCounter:Reset("Healium_Components")
+		PerformanceCounter:Reset("Healium_Core")
 		LastPerformanceCounterReset = GetTime()
 		Message(L.healium_CONSOLE_RESET_PERF)
 	end
@@ -476,6 +477,94 @@ SlashCmdList["THLM"] = function(cmd)
 	else
 		SlashHandlerShowHelp()
 	end
+end
+
+-- TabMenu with Dropdown list
+-------------------------------------------------------
+if C["healium"].showTab == true and TabMenu and TukuiChatBackgroundRight then
+	local function MenuToggleHeader(info, header)
+		if InCombatLockdown() then
+			Message(L.healium_NOTINCOMBAT)
+			return
+		end
+		ToggleHeader(header)
+	end
+	-- menu function (see Interface\Addons\Healium\HealiumMenu.lua  and  http://www.wowwiki.com/Using_UIDropDownMenu)
+	local function MenuInitializeDropDown(self, level)
+		level = level or 1
+		local info
+		if level == 1 then
+			info = UIDropDownMenu_CreateInfo()
+			info.text = L.healium_TAB_TITLE
+			info.isTitle = 1
+			info.owner = self:GetParent()
+			info.func = MenuToggleHeader
+			info.arg1 = TankRaidHeader
+			UIDropDownMenu_AddButton(info, level)
+			if PlayerRaidHeader then
+				info = UIDropDownMenu_CreateInfo()
+				info.text = PlayerRaidHeader:IsShown() and L.healium_TAB_PLAYERFRAMEHIDE or L.healium_TAB_PLAYERFRAMESHOW
+				info.notCheckable = 1
+				info.owner = self:GetParent()
+				info.func = MenuToggleHeader
+				info.arg1 = PlayerRaidHeader
+				UIDropDownMenu_AddButton(info, level)
+			end
+			if TankRaidHeader then
+				info = UIDropDownMenu_CreateInfo()
+				info.text = TankRaidHeader:IsShown() and L.healium_TAB_TANKFRAMEHIDE or L.healium_TAB_TANKFRAMESHOW
+				info.notCheckable = 1
+				info.owner = self:GetParent()
+				info.func = MenuToggleHeader
+				info.arg1 = TankRaidHeader
+				UIDropDownMenu_AddButton(info, level)
+			end
+			if PetRaidHeader then
+				info = UIDropDownMenu_CreateInfo()
+				info.text = PetRaidHeader:IsShown() and L.healium_TAB_PETFRAMEHIDE or L.healium_TAB_PETFRAMESHOW
+				info.notCheckable = 1
+				info.owner = self:GetParent()
+				info.func = MenuToggleHeader
+				info.arg1 = PetRaidHeader
+				UIDropDownMenu_AddButton(info, level)
+			end
+			if NamelistRaidHeader then
+				info = UIDropDownMenu_CreateInfo()
+				info.text = NamelistRaidHeader:IsShown() and L.healium_TAB_NAMELISTFRAMEHIDE or L.healium_TAB_NAMELISTFRAMESHOW
+				info.notCheckable = 1
+				info.owner = self:GetParent()
+				info.func = MenuToggleHeader
+				info.arg1 = NamelistRaidHeader
+				UIDropDownMenu_AddButton(info, level)
+			end
+			info = UIDropDownMenu_CreateInfo()
+			info.text = CLOSE
+			info.owner = self:GetParent()
+			info.func = self.HideMenu
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+
+	local tab = TabMenu:AddCustomTab(TukuiChatBackgroundRight, "LEFT", "Healium", "Interface\\AddOns\\Healium_Tukui\\medias\\ability_druid_improvedtreeform")
+
+	-- create menu frame
+	local menu = CreateFrame("Frame", "HealiumMenu", tab, "UIDropDownMenuTemplate")
+	menu:SetPoint("BOTTOM", tab, "TOP")
+	UIDropDownMenu_Initialize(menu, MenuInitializeDropDown, "MENU")
+	-- events
+	tab:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP", 0, T.Scale(6))
+		GameTooltip:ClearAllPoints()
+		GameTooltip:SetPoint("BOTTOM", self, "TOP", 0, T.mult)
+		GameTooltip:ClearLines()
+		GameTooltip:AddLine(L.healium_TAB_TOOLTIP, 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	tab:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+	tab:SetScript("OnClick", function(self, button)
+		GameTooltip:Hide()
+		ToggleDropDownMenu(1, nil, menu, self, 0, 100)
+	end)
 end
 
 -- Event handlers

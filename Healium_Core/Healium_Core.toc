@@ -1,0 +1,9 @@
+## Interface: 40200
+## Version: 1.1
+## Author: SinaC
+## Title: Healium Core
+## Credits: Engypoo
+## Notes: Lib to add Healium features to unitframes
+## URL: https://github.com/SinaC/Healium_Core
+
+Healium_Core.xml

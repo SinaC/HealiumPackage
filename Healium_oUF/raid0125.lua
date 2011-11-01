@@ -2,7 +2,7 @@
 -- Create oUF raid frames and add Healium components
 -------------------------------------------------------
 -- Get Healium Components
-local H = unpack(HealiumComponents)
+local H = unpack(HealiumCore)
 
 -- Tags
 local function utf8sub(string, i, dots)
