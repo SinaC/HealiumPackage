@@ -5,3 +5,5 @@ engine[2] = {}		-- C, config
 engine[3] = {}		-- L, localization
 
 HealiumCore = engine -- global variable
+
+engine.Private = {}

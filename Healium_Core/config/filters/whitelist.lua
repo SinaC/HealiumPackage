@@ -1,90 +1,121 @@
 local H, C, L = unpack(select(2,...))
 
+-- spellID  or {spellID, priority}     priority: lower value -> higher priority
+-- no priority -> 1000 (lowest priority)
 C["whitelist"] = {
 -- PVE
 ------
 --MISC
-	67479,	-- Impale
+	{67479, 10},	-- Impale
 --CATA DEBUFFS
-	--Baradin Hold
-	95173,	-- Consuming Darkness
-	88942,	-- Meteor Slash (Argaloth)
+	--Baradin Hold {752] -- Baradin Hold 
+	{95173, 9},	-- Consuming Darkness
+	{88942, 9},	-- Meteor Slash (Argaloth)
 
---Blackwing Descent
+--Blackwing Descent {754] -- Blackwing Descent 
 	--Magmaw
-	91911,	-- Constricting Chains
-	94679,	-- Parasitic Infection
-	94617,	-- Mangle
-	91923,	-- Infectious Vomit
+	{91911, 6},	-- Constricting Chains
+	{94679, 6},	-- Parasitic Infection
+	{94617, 7},	-- Mangle
+	{91923, 7},	-- Infectious Vomit
 	--Omnitron Defense System
-	79835,	-- Poison Soaked Shell
-	91433,	-- Lightning Conductor
-	91521,	-- Incineration Security Measure
-	92048,	-- Shadow Infusion
+	{79835, 6},	-- Poison Soaked Shell
+	{91433, 9},	-- Lightning Conductor
+	{91521, 6},	-- Incineration Security Measure
+	{92048, 7},	-- Shadow Infusion
+	{79505, 7},	-- Flamethrower
+	{80161, 8},	-- Chemical Cloud
+	{79501, 7},	-- Acquiring Target
+	{80011, 8},	-- Soaked in Poison
+	{80094, 8},	-- Fixate
+	{92023, 6},	-- Encasing Shadows
+	{92053, 6},	-- Shadow Conductor
 	--Maloriak
-	77699,	-- Flash Freeze
-	77786,	-- Consuming Flames
-	77760,	-- Biting Chill
+	{77699, 7},	-- Flash Freeze
+	{77786, 7},	-- Consuming Flames
+	{77760, 8},	-- Biting Chill
+	{91829, 8},	-- Fixate
+	{92787, 6},	-- Engulfing Darkness
 	--Atramedes
-	92423,	-- Searing Flame
-	92485,	-- Roaring Flame
-	92407,	-- Sonic Breath
+	{92423, 7},	-- Searing Flame
+	{92485, 8},	-- Roaring Flame
+	{92407, 9},	-- Sonic Breath
+	{78092, 8},	-- Tracking
+	{78897, 7},	-- Noisy
 	--Chimaeron
-	82881,	-- Break
-	82705,	-- Finkle's Mixture
-	89084,	-- Low Health
+	{82881, 8},	-- Break
+	{82705, 10},	-- Finkle's Mixture
+	{89084, 7},	-- Low Health
+	{82890, 9},	-- Mortality
 	--Nefarian
-	92053,	-- Shadow Conductor
-	--Sinestra
-	92956,	--Wrack
---The Bastion of Twilight
-	--Valiona & Theralion
-	92878,	-- Blackout
-	86840,	-- Devouring Flames
-	95639,	-- Engulfing Magic
-	92861,	-- Twilight Meteorite
+	{92053, 9},	-- Shadow Conductor
+	{94128, 8},	-- Tail Lash
+	{79339, 6},	-- Explosive Cinders
+	{79318, 6},	-- Dominion
 
+--The Bastion of Twilight
 	--Halfus Wyrmbreaker
-	39171,	-- Malevolent Strikes
+	{39171, 8},	-- Malevolent Strikes
+	{86169, 8},	-- Furious Roar
+
+	--Valiona & Theralion
+	{92878, 9},	-- Blackout
+	86840,		-- Devouring Flames
+	{95639, 8},	-- Engulfing Magic
+	92861,		-- Twilight Meteorite
+	{86202, 8},	-- Twilight Shift
 
 	--Twilight Ascendant Council
 	92511,	-- Hydro Lance
-	82762,	-- Waterlogged
-	92505,	-- Frozen
-	92518,	-- Flame Torrent
-	83099,	-- Lightning Rod
-	92075,	-- Gravity Core
-	92488,	-- Gravity Crush
-	82662,	-- Burning Blood
-	82667,	-- Heart of Ice
-	83500,	-- Swirling Winds
-	83587,	-- Magnetic Pull
+	{82762, 8},	-- Waterlogged
+	92505,		-- Frozen
+	92518,		-- Flame Torrent
+	{83099, 8},	-- Lightning Rod
+	92075,		-- Gravity Core
+	92488,		-- Gravity Crush
+	{82662, 8},	-- Burning Blood
+	{82667, 8},	-- Heart of Ice
+	83500,		-- Swirling Winds
+	83587,		-- Magnetic Pull
+	{82285, 7},	-- Elemental Stasis
+	{92488, 8},	-- Gravity Crush
 
 	--Cho'gall
-	86028,	-- Cho's Blast
-	86029,	-- Gall's Blast
-	81836,	-- Corruption: Accelerated
-	82125,	-- Corruption: Malformation
-	82170,	-- Corruption: Absolute
-	93200,	-- Corruption: Sickness
+	{86028, 9},	-- Cho's Blast
+	{86029, 9},	-- Gall's Blast
+	{81836, 7},	-- Corruption: Accelerated
+	{82125, 7},	-- Corruption: Malformation
+	{82170, 7},	-- Corruption: Absolute
+	{93200, 7},	-- Corruption: Sickness
+	{93189, 8}, -- Corrupted Blood
+	{93133, 8}, -- Debilitating Beam
 
---Throne of the Four Winds
+	--Sinestra
+	{92956, 6},	--Wrack
+
+--Throne of the Four Winds {773] -- Throne of the Four Winds 
 	--Conclave of Wind
-		93123,	-- Wind Chill
+	{93123, 8},	-- Wind Chill
 		--Nezir <Lord of the North Wind>
-		93131,	--Ice Patch
+		{93131, 8},	--Ice Patch
 		--Anshal <Lord of the West Wind>
-		86206,	--Soothing Breeze
-		93122,	--Toxic Spores
+		{86206, 8},	--Soothing Breeze
+		{93122, 7},	--Toxic Spores
 		--Rohash <Lord of the East Wind>
-		93058,	--Slicing Gale
-	--Al'Akir
-	87873,	-- Static Shock
-	93260,	-- Ice Storm
-	93295,	-- Lightning Rod
-	93279,	-- Acid Rain
+		{93058, 8},	--Slicing Gale
 
--- Firelands, thanks Kaelhan :)
+		{86481, 8},	-- Hurricane
+		{85576, 9},	-- Withering Winds
+		{85573, 9},	-- Deafening Winds
+	--Al'Akir
+	{87873, 8},	-- Static Shock
+	93260,		-- Ice Storm
+	{93295, 7},	-- Lightning Rod
+	{93279, 8},	-- Acid Rain
+	{88427, 8},	-- Electrocute
+	{93284, 6},	-- Squall Line
+
+-- Firelands, thanks Kaelhan :)  {800] -- Firelands 
 	-- Beth'tilac
 		99506,	-- Widows Kiss
 		97202,	-- Fiery Web Spin
@@ -98,7 +129,7 @@ C["whitelist"] = {
 		99389,	-- Imprinted
 		101729,	-- Blazing Claw
 		99461,	-- Blazing Power
-		100029,	--  Alysra's Razor
+		100029,	-- Alysra's Razor
 	-- Shannox
 		99840,	-- Magma Rupture
 		99837,	-- Crystal Prison

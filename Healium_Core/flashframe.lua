@@ -4,8 +4,13 @@
 -- APIs:
 --FlashFrame:ShowFlashFrame(frame, color, size, brightness): start a flash on frame, size must be 10 times bigger than frame size to see it, brightness: 1->100
 --FlashFrame:HideFlashFrame(frame): stop a flash
---FlashFrame:Fadeout(frame, duration): start a fadeout
---FlashFrame:StopFadeout(frame): stop a fadeout
+--FlashFrame:Blink(frame, duration): start a blink
+--FlashFrame:StopBlink(frame): stop a blink
+--FlashFrame:Pulse(frame, scale): start a pulse
+--FlashFrame:StopPulse(frame): stop a pulse
+--FlashFrame:ZoomIn(frame, scale): zoom in
+--FlashFrame:ZoomOut(frame): zoom out
+
 
 local H, C, L = unpack(select(2, ...))
 
@@ -106,34 +111,100 @@ function FlashFrame:HideFlashFrame(frame)
 end
 
 --------------------------------------------
-local function SetUpAnimGroup(self)
-	--print("SetUpAnimGroup")
-	self.anim = self:CreateAnimationGroup("Flash")
-	self.anim.fadein = self.anim:CreateAnimation("ALPHA", "FadeIn")
-	self.anim.fadein:SetChange(1)
-	self.anim.fadein:SetOrder(2)
+-- Blink  Animation: http://wowprogramming.com/docs/widgets_hierarchy
+function FlashFrame:Blink(self, duration)
+	--print("FlashFrame:Blink "..self:GetName())
+	if not self.ffBlink then
+		--print("SetUpAnimGroup")
+		self.ffBlink = self:CreateAnimationGroup("Blink")
 
-	self.anim.fadeout = self.anim:CreateAnimation("ALPHA", "FadeOut")
-	self.anim.fadeout:SetChange(-1)
-	self.anim.fadeout:SetOrder(1)
-end
+		local fadeIn = self.ffBlink:CreateAnimation("ALPHA", "FadeIn")
+		fadeIn:SetChange(1)
+		fadeIn:SetOrder(2)
+		self.ffBlink.fadeIn = fadeIn
 
-function FlashFrame:Fadeout(self, duration)
-	--print("FlashFrame2:Flash "..self:GetName())
-	if not self.anim then
-		SetUpAnimGroup(self)
+		local fadeOut = self.ffBlink:CreateAnimation("ALPHA", "FadeOut")
+		fadeOut:SetChange(-1)
+		fadeOut:SetOrder(1)
+		self.ffBlink.fadeOut = fadeOut
 	end
-	--print("FlashFrame2:Flash  after creation")
+	--print("FlashFrame:Blink  after creation")
 
 
-	self.anim.fadein:SetDuration(duration)
-	self.anim.fadeout:SetDuration(duration)
-	self.anim:Play()
+	self.ffBlink.fadeIn:SetDuration(duration)
+	self.ffBlink.fadeOut:SetDuration(duration)
+	self.ffBlink:Play()
 end
 
-function FlashFrame:StopFadeout(self)
-	if self.anim then
-		self.anim:Finish()
+function FlashFrame:StopBlink(self)
+	if self.ffBlink then
+		self.ffBlink:Stop()
+	end
+end
+
+--------------------------------------------
+-- Pulse  Animation: http://wowprogramming.com/docs/widgets_hierarchy
+function FlashFrame:Pulse(self, scale)
+	--print("FlashFrame:Pulse "..self:GetName())
+	scale = scale or 1.5
+	if not self.ffPulse then
+		self.ffPulse = self:CreateAnimationGroup("Pulse")
+
+		local pulseIn = self.ffPulse:CreateAnimation("Scale")
+		pulseIn:SetScale(scale, scale)
+		pulseIn:SetDuration(0.2)
+		pulseIn:SetOrder(1)
+		self.ffPulse.pulseIn = pulseIn
+
+		local pulseOut = self.ffPulse:CreateAnimation("Scale")
+		pulseOut:SetScale(0.5, 0.5)
+		pulseOut:SetDuration(0.8)
+		pulseOut:SetOrder(2)
+		self.ffPulse.pulseOut = pulseOut
+	end
+	--print("FlashFrame:Pulse  after creation")
+
+	--self.ffAnim.pulseIn:SetDuration(duration)
+	--self.ffAnim.pulseOut:SetDuration(duration)
+	self.ffPulse:Play()
+end
+
+function FlashFrame:StopPulse(self)
+	if self.ffPulse then
+		self.ffPulse:Stop()
+	end
+end
+
+--------------------------------------------
+-- Zoom  Animation: http://wowprogramming.com/docs/widgets_hierarchy
+function FlashFrame:ZoomIn(self, scale)
+	--print("FlashFrame:Pulse "..self:GetName())
+	scale = scale or 1.5
+	if not self.ffZoom then
+		self.ffZoom = self:CreateAnimationGroup("Zoom")
+
+		local zoomIn = self.ffZoom:CreateAnimation("Scale")
+		zoomIn:SetScale(scale, scale)
+		zoomIn:SetDuration(0.2)
+		zoomIn:SetOrder(1)
+		self.ffZoom.zoomIn = zoomIn
+
+		local keepZoom = self.ffZoom:CreateAnimation("Scale")
+		keepZoom:SetScale(scale, scale)
+		keepZoom:SetDuration(60)
+		keepZoom:SetOrder(2)
+		self.ffZoom.keepZoom = keepZoom
+	end
+	--print("FlashFrame:Pulse  after creation")
+
+	--self.ffAnim.pulseIn:SetDuration(duration)
+	--self.ffAnim.pulseOut:SetDuration(duration)
+	self.ffZoom:Play()
+end
+
+function FlashFrame:ZoomOut(self)
+	if self.ffZoom then
+		self.ffZoom:Stop()
 	end
 end
 

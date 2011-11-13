@@ -1,8 +1,10 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
-	<Script file="config.lua"/>
+	<Script file="config\config.lua"/>
+	<Script file="config\profiles.lua"/>
 	<Script file="locales\english.lua"/>
 	<Script file="locales\french.lua"/>
 	<Script file="dumpsack.lua"/>
 	<Script file="raid0125.lua"/>
-	<Script file="oUF_hTukz_Raid26_40.lua"/>
+	<Script file="raid2640.lua"/>
+	<Script file="raidutilities.lua"/>
 </Ui>

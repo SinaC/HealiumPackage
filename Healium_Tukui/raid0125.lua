@@ -1,6 +1,7 @@
 local ADDON_NAME, _ = ...
 
-local H, HC = unpack(HealiumCore)
+--local H, HC = unpack(HealiumCore)
+local H = unpack(HealiumCore)
 
 -- Get oUF
 local oUF = oUFTukui or oUF
@@ -21,6 +22,37 @@ local PlayerRaidHeader = nil
 local PetRaidHeader = nil
 local TankRaidHeader = nil
 local NamelistRaidHeader = nil
+
+-- Namelist functions
+------------------------------------
+local function AddToNamelist(list, name)
+	local newList = ""
+	if list ~= "" then
+		local names = { strsplit(",", list) }
+		for _, v in ipairs(names) do
+			if v == name then return false, list end
+		end
+		newList = list .. "," .. name
+	else
+		newList = name
+	end
+	return true, newList
+end
+
+local function RemoveFromNamelist(list, name)
+	if list == "" then return false, list end
+	local names = { strsplit(",", list) }
+	local found = false
+	newList = ""
+	for _, v in ipairs(names) do
+		if v == name then
+			found = true
+		else
+			newList = (newList == "") and v or (newList .. "," .. v)
+		end
+	end
+	return found, newList
+end
 
 -- Skin Healium Buttons/Buff/Debuffs
 ------------------------------------
@@ -93,6 +125,34 @@ function H:CreateHealiumBuff(parent, name, size, anchor)
 	buff.count:SetJustifyH("CENTER")
 	--print("<Tukui:CreateHealiumBuff")
 	return buff
+end
+
+-- LFD role handler
+------------------------------------
+local function LFDRoleUpdate(self, event)
+	local unit = self.unit
+	local role = UnitGroupRolesAssigned(unit)
+	-- default behaviour
+	local lfdrole = self.LFDRole
+	if role == "TANK" or role == "HEALER" or role == "DAMAGER" then
+		lfdrole:SetTexCoord(GetTexCoordsForRoleSmallCircle(role))
+		lfdrole:Show()
+	else
+		lfdrole:Hide()
+	end
+	-- build list of tanks
+	if C["healium"].showTanks == true and TankRaidHeader then
+		local name = GetUnitName(unit, false)
+		local list = TankRaidHeader:GetAttribute("nameList") or ""
+--print("LFDRoleUpdate: "..tostring(name).."  "..tostring(role).."  "..tostring(list))
+		if role == "TANK" then
+			_, list = AddToNamelist(list, name)
+		else
+			_, list = RemoveFromNamelist(list, name)
+		end
+--print("LFDRoleUpdate: -->"..tostring(list))
+		TankRaidHeader:SetAttribute("nameList", list)
+	end
 end
 
 -- Create Tukui raid frames
@@ -197,6 +257,7 @@ local function Shared(self, unit)
 	LFDRole:Point("TOPRIGHT", -2, -2)
 	LFDRole:SetTexture("Interface\\AddOns\\Tukui\\medias\\textures\\lfdicons.blp")
 	self.LFDRole = LFDRole
+	self.LFDRole.Override = LFDRoleUpdate
 
 	local MasterLooter = health:CreateTexture(nil, "OVERLAY")
 	MasterLooter:Height(12*T.raidscale)
@@ -260,7 +321,8 @@ local function Shared(self, unit)
 		}
 	end
 
-	H:AddHealiumComponents(self)
+	-- Register frame to Healium
+	H:RegisterFrame(self)
 
 	return self
 end
@@ -341,7 +403,7 @@ local function SlashHandlerDump(args)
 		end
 	elseif args == "perf" then
 		local infos = PerformanceCounter:Get("Healium_Core")
-		if info then
+		if infos then
 			Dump(0, nil, infos)
 			DumpSack:Flush("Healium_Tukui")
 		end
@@ -351,7 +413,7 @@ local function SlashHandlerDump(args)
 		local infos = H:DumpInformation()
 		local found = false
 		if infos and infos.Units then
-			for _, unitInfo in info.Units do
+			for _, unitInfo in infos.Units do
 				if unitInfo.Unit == arg1 or unitInfo.Unitname == arg1 then
 					Dump(0, nil, unitInfo)
 					found = true
@@ -405,10 +467,11 @@ local function SlashHandlerNamelist(cmd)
 			end
 		end
 		if name then
-			local fAdded = AddToNamelist(C["healium"].namelist, name)
-			if not fAdded then
+			local added, list = AddToNamelist(C["healium"].namelist, name)
+			if not added then
 				Message(L.healium_CONSOLE_NAMELIST_ADDALREADY)
 			else
+				C["healium"].namelist = list
 				Message(L.healium_CONSOLE_NAMELIST_ADDED:format(name))
 				if NamelistRaidHeader then
 					NamelistRaidHeader:SetAttribute("namelist", C["healium"].namelist)
@@ -429,10 +492,11 @@ local function SlashHandlerNamelist(cmd)
 			end
 		end
 		if name then
-			local fRemoved = RemoveFromNamelist(C["healium"].namelist, name)
-			if not fRemoved then
+			local removed, list = RemoveFromNamelist(C["healium"].namelist, name)
+			if not removed then
 				Message(L.healium_CONSOLE_NAMELIST_REMOVENOTFOUND)
 			else
+				C["healium"].namelist = list
 				Message(L.healium_CONSOLE_NAMELIST_REMOVED:format(name))
 				if NamelistRaidHeader then
 					NamelistRaidHeader:SetAttribute("namelist", C["healium"].namelist)
@@ -482,7 +546,7 @@ end
 
 -- TabMenu with Dropdown list
 -------------------------------------------------------
-if C["healium"].showTab == true and TabMenu and TukuiChatBackgroundRight then
+if C["healium"].showTabMenu == true and TabMenu and TukuiChatBackgroundRight then
 	local function MenuToggleHeader(info, header)
 		if InCombatLockdown() then
 			Message(L.healium_NOTINCOMBAT)
@@ -498,6 +562,7 @@ if C["healium"].showTab == true and TabMenu and TukuiChatBackgroundRight then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = L.healium_TAB_TITLE
 			info.isTitle = 1
+			info.notCheckable = 1
 			info.owner = self:GetParent()
 			info.func = MenuToggleHeader
 			info.arg1 = TankRaidHeader
@@ -540,6 +605,7 @@ if C["healium"].showTab == true and TabMenu and TukuiChatBackgroundRight then
 			end
 			info = UIDropDownMenu_CreateInfo()
 			info.text = CLOSE
+			info.notCheckable = 1
 			info.owner = self:GetParent()
 			info.func = self.HideMenu
 			UIDropDownMenu_AddButton(info, level)
@@ -575,6 +641,9 @@ eventHandlers:RegisterEvent("PLAYER_LOGIN")
 eventHandlers:RegisterEvent("ADDON_LOADED")
 eventHandlers:SetScript("OnEvent", function(self, event, arg1)
 	if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
+		-- Initialize Healium
+		H:Initialize(C["healium"])
+		-- Display version
 		local version = GetAddOnMetadata(ADDON_NAME, "version")
 		local libVersion = GetAddOnMetadata("Healium_Core", "version")
 		if version and libVersion then
@@ -584,8 +653,8 @@ eventHandlers:SetScript("OnEvent", function(self, event, arg1)
 		end
 		Message(L.healium_GREETING_OPTIONS)
 	elseif event == "PLAYER_LOGIN" then
-		-- Set tooltip anchor
-		HC.general.buttonTooltipAnchor = _G["TukuiTooltipAnchor"] -- change button tooltip anchor
+		---- Set tooltip anchor
+		--HC.general.buttonTooltipAnchor = _G["TukuiTooltipAnchor"] -- change button tooltip anchor
 
 		-- Kill blizzard raid frames
 		local dummy = function() return end
@@ -617,7 +686,7 @@ oUF:Factory(function(self)
 
 	oUF:SetActiveStyle("TukuiHealiumR01R25")
 
-	PlayerRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaid0125", nil, "custom [@raid26,exists] hide;show",
+	PlayerRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaid0125", nil, Visibility25,
 		'oUF-initialConfigFunction', [[
 			local header = self:GetParent()
 			self:SetWidth(header:GetAttribute('initial-width'))
@@ -625,9 +694,9 @@ oUF:Factory(function(self)
 		]],
 		'initial-width', T.Scale(C["healium"].unitframeWidth*T.raidscale),
 		'initial-height', T.Scale(C["healium"].unitframeHeight*T.raidscale),
-		"showSolo", C["unitframes"].showsolo,
+		"showSolo", C["unitframes"].showsolo or true,
 		"showParty", true,
-		"showPlayer", C["unitframes"].showplayerinparty,
+		"showPlayer", C["unitframes"].showplayerinparty or true,
 		"showRaid", true,
 		"groupFilter", "1,2,3,4,5,6,7,8",
 		"groupingOrder", "1,2,3,4,5,6,7,8",
@@ -637,7 +706,7 @@ oUF:Factory(function(self)
 	PlayerRaidHeader:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 180, -300*T.raidscale)
 	PlayerRaidHeader.hVisibilityAttribute = Visibility25
 
-	if C["healium"].showPets then
+	if C["healium"].showPets == true then
 		PetRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaidPet0125", "SecureGroupPetHeaderTemplate", "custom [@raid11,exists] hide;show",
 			'oUF-initialConfigFunction', [[
 				local header = self:GetParent()
@@ -646,7 +715,7 @@ oUF:Factory(function(self)
 			]],
 			'initial-width', T.Scale(C["healium"].unitframeWidth*T.raidscale),
 			'initial-height', T.Scale(C["healium"].unitframeHeight*T.raidscale),
-			"showSolo", C["unitframes"].showsolo,
+			"showSolo", C["unitframes"].showsolo or true,
 			"showParty", true,
 			"showRaid", true,
 			"yOffset", T.Scale(-4),
@@ -654,17 +723,41 @@ oUF:Factory(function(self)
 			"groupingOrder", "1,2,3,4,5,6,7,8",
 			"groupBy", "GROUP",
 			"maxColumns", 1,
-			"unitsPerColumn", 10,
+			"unitsPerColumn", C["healium"].maxPets or 5,
 			"filterOnPet", true,
 			"sortMethod", "NAME"
 		)
 		PetRaidHeader:SetPoint("TOPLEFT", PlayerRaidHeader, "BOTTOMLEFT", 0, -50*T.raidscale)
 		PetRaidHeader.hVisibilityAttribute = Visibility10
 	end
-
-	if C["healium"].showTanks then
+	
+	-- if C["healium"].showTanks == true then
+		-- -- Tank frame (attributes: [["groupFilter", "MAINTANK,TANK"]],  [["groupBy", "ROLE"]],    showParty, showRaid but not showSolo)
+		-- TankRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaidTank0125", nil, Visibility25,
+			-- 'oUF-initialConfigFunction', [[
+				-- local header = self:GetParent()
+				-- self:SetWidth(header:GetAttribute('initial-width'))
+				-- self:SetHeight(header:GetAttribute('initial-height'))
+			-- ]],
+			-- 'initial-width', T.Scale(C["healium"].unitframeWidth*T.raidscale),
+			-- 'initial-height', T.Scale(C["healium"].unitframeHeight*T.raidscale),
+			-- "showSolo", false,
+			-- "showParty", true,
+			-- "showRaid", true,
+			-- "showPlayer", C["unitframes"].showplayerinparty or true,
+			-- "yOffset", T.Scale(-4),
+			-- "groupFilter", "MAINTANK",--,MAINASSIST",--,TANK",
+			-- "groupingOrder", "1,2,3,4,5,6,7,8",
+			-- "groupBy", "ROLE"
+			-- --"sortMethod", "NAME"
+		-- )
+		-- --TankRaidHeader:SetPoint("BOTTOMLEFT", PlayerRaidHeader, "TOPLEFT", 0, 50*T.raidscale)
+		-- TankRaidHeader:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -400*T.raidscale, -300*T.raidscale)
+		-- TankRaidHeader.hVisibilityAttribute = Visibility25
+	-- end
+	if C["healium"].showTanks == true then
 		-- Tank frame (attributes: [["groupFilter", "MAINTANK,TANK"]],  [["groupBy", "ROLE"]],    showParty, showRaid but not showSolo)
-		TankRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaidTank0125", nil, Visibilityl25,
+		TankRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaidTank0125", nil, Visibility25,
 			'oUF-initialConfigFunction', [[
 				local header = self:GetParent()
 				self:SetWidth(header:GetAttribute('initial-width'))
@@ -675,16 +768,19 @@ oUF:Factory(function(self)
 			"showSolo", false,
 			"showParty", true,
 			"showRaid", true,
-			"showPlayer", C["unitframes"].showplayerinparty,
+			"showPlayer", C["unitframes"].showplayerinparty or true,
 			"yOffset", T.Scale(-4),
-			"groupFilter", "MAINTANK,TANK",
-			"sortMethod", "NAME"
+			"sortMethod", "NAME",
+			"maxColumns", 1,
+			"unitsPerColumn", 20,
+			"nameList", ""
 		)
-		TankRaidHeader:SetPoint("BOTTOMLEFT", PlayerRaidHeader, "TOPLEFT", 0, 50*T.raidscale)
+		--TankRaidHeader:SetPoint("BOTTOMLEFT", PlayerRaidHeader, "TOPLEFT", 0, 50*T.raidscale)
+		TankRaidHeader:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -500*T.raidscale, -300*T.raidscale)
 		TankRaidHeader.hVisibilityAttribute = Visibility25
 	end
 
-	if C["healium"].showNamelist then
+	if C["healium"].showNamelist == true then
 		-- Namelist frame
 		NamelistRaidHeader = self:SpawnHeader("oUF_TukuiHealiumRaidNamelist0125", nil, Visibility25,
 			'oUF-initialConfigFunction', [[
@@ -697,14 +793,14 @@ oUF:Factory(function(self)
 			"showSolo", C["unitframes"].showsolo,
 			"showParty", true,
 			"showRaid", true,
-			"showPlayer", C["unitframes"].showplayerinparty,
+			"showPlayer", C["unitframes"].showplayerinparty or true,
 			"yOffset", T.Scale(-4),
 			"sortMethod", "NAME",
 			"maxColumns", 1,
 			"unitsPerColumn", 20,
-			"nameList", C["healium"].namelist
+			"nameList", C["healium"].namelist or ""
 		)
-		NamelistRaidHeader:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -400, -300)
+		NamelistRaidHeader:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -400*T.raidscale, -300*T.raidscale)
 		NamelistRaidHeader.hVisibilityAttribute = Visibility25
 	end
 end)

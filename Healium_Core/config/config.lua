@@ -2,9 +2,10 @@ local H, C, L = unpack(select(2,...))
 
 C["general"] = {
 	debug = 1000,
+	--debugDebuff = "Curse",
 
 	showOOM = true,						-- color heal button in blue when OOM
-	showOOR = true,						-- very time consuming and not really useful if unitframes are already tagged as OOR
+	showOOR = false,					-- very time consuming and not really useful if unitframes are already tagged as OOR
 
 	maxButtonCount = 12,				-- maximum number of buttons
 	buttonSpacing = 2,					-- distance between 2 buttons
@@ -22,19 +23,21 @@ C["general"] = {
 	debuffSpacing = 2,					-- distance between 2 debuffs
 	showDebuffTooltip = true,			-- display debuff tooltip
 	debuffTooltipAnchor = nil,			-- debuff tooltip anchor (nil means debuff itself)
+	showPriorityDebuff = false,			-- display only one debuff frame displaying the most important debuff (priority may be added in whilelist, lower value means higher priority)
 
 	-- DISPELLABLE: show only dispellable debuff
 	-- BLACKLIST: exclude non-dispellable debuff from list
 	-- WHITELIST: include non-dispellable debuff from list
 	-- NONE: show every non-dispellable debuff
-	debuffFilter = "BLACKLIST",
-	highlightDispel = true,				-- highlight dispel button when debuff is dispellable (no matter they are shown or not)
-	playSoundOnDispel = true,			-- play a sound when a debuff is dispellable (no matter they are shown or not)
+	debuffFilter = "WHITELIST",
+	highlightDispel = true,				-- highlight dispel button when debuff is dispellable (no matter they are shown or not but only if not in dispellable filter)
+	playSoundOnDispel = true,			-- play a sound when a debuff is dispellable (no matter they are shown or not but only if not in dispellable filter)
 	dispelSoundFile = "Sound\\Doodad\\BellTollHorde.wav",
 	-- FLASH: flash button
-	-- FADEOUT: fadeout/fadein button
+	-- BLINK: blink button
+	-- PULSE: pulse button
 	-- NONE: no flash
-	flashStyle = "NONE", 				-- flash/fadeout dispel button when debuff is dispellable (no matter they are shown or not)
+	dispelAnimation = "PULSE", 			-- animate dispel button when debuff is dispellable (no matter they are shown or not but only if not in dispellable filter)
 }
 
 C["colors"] = {

@@ -13,13 +13,14 @@ C["PRIEST"] = {
 	-- 6346 Fear Ward
 	-- 32546 Binding Heal
 	-- 33076 Prayer of Mending
+	-- 34861 Circle of Healing (Holy)
 	-- 47540 Penance (Discipline)
 	-- 47788 Guardian Spirit (Holy)
 	-- 73325 Leap of Faith
 	-- 88684 Holy Word: Serenity (Holy)
 	[1] = { -- Discipline
 		spells = {
-			{ spellID = 17, debuffs = { 6788 } }, -- Power Word: Shield not castable if affected by Weakened Soul
+			{ spellID = 17, debuffs = { 6788 } }, -- Power Word: Shield, not castable if affected by Weakened Soul
 			{ spellID = 139 }, -- Renew
 			{ spellID = 2061 }, -- Flash Heal
 			{ spellID = 2050 }, -- Heal
@@ -39,8 +40,9 @@ C["PRIEST"] = {
 			{ spellID = 2060 }, -- Greater Heal
 			{ spellID = 88684 }, -- Holy Word: Serenity
 			{ spellID = 33076 }, -- Prayer of Mending
+			{ spellID = 34861 }, -- Circle of Healing (Holy)
 			{ spellID = 596 }, -- Prayer of Healing
-			{ spellID = 47788 }, -- Guardian Spirit
+			{ spellID = 47788 }, -- Guardian Spirit (Holy)
 			{ spellID = 527, dispels = { ["Magic"] = true } }, -- Dispel Magic
 			{ spellID = 528, dispels = { ["Disease"] = true } }, -- Cure Disease
 		},

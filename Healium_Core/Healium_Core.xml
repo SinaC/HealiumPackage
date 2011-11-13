@@ -1,6 +1,8 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
 	<Script file="init.lua"/>
 
+	<Script file="private.lua"/>
+
 	<Script file="constants.lua"/>
 
 	<Script file="locales\english.lua"/>
@@ -8,7 +10,7 @@
 
 	<Script file="debug\PerformanceCounter.lua"/>
 
-	<Script file="config\general.lua"/>
+	<Script file="config\config.lua"/>
 	<Script file="config\classes\druid.lua"/>
 	<Script file="config\classes\paladin.lua"/>
 	<Script file="config\classes\priest.lua"/>
@@ -16,10 +18,23 @@
 	<Script file="config\classes\hunter.lua"/>
 	<Script file="config\filters\blacklist.lua"/>
 	<Script file="config\filters\whitelist.lua"/>
-	<Script file="config\colors.lua"/>
+	<Script file="config\filters\dispellable.lua"/>
 	<Script file="config\profiles.lua"/>
 
 	<Script file="flashframe.lua"/>
 	<Script file="ui.lua"/>
-	<Script file="components.lua"/>
+	<Script file="core.lua"/>
+
+	<Script file="compact.lua"/>
+
+	<Script file="finalize.lua"/>
+
+
+	<Button name="CompactFrameTemplate" virtual="true" inherits="SecureUnitButtonTemplate"> <!-- SecureActionButtonTemplate -->
+		<Size x="80" y="50"/>
+		<Scripts>
+			<OnLoad>CompactFrame_OnLoad(self)</OnLoad>
+			<OnAttributeChanged>CompactFrame_OnAttributeChanged(self, name, value)</OnAttributeChanged>
+		</Scripts>
+	</Button>
 </Ui>

@@ -3,8 +3,8 @@ Healium_oUF_Config = {
 	unitframeHeight = 28,
 
 	showTanks = true,
-	showPets = true,
-	showNamelist = true,
+	showPets = false,
+	showNamelist = false,
 	namelist = "Yoog,Sweetlight,Mirabillis",
 
 	showsymbols = true,

@@ -3,23 +3,27 @@
 -------------------------------------------------------
 
 -- Exported functions
--- H:AddHealiumComponents(frame)	add healium buttons/buffs/debuffs to frame
+-- H:Initialize(config)				Initialize Healium and merge config parameter with own config
+-- H:RegisterFrame(frame)			register a frame in Healium
 -- H:DumpInformation()				return a table with every available information about buttons/buffs/debuffs
 
-local ADDON_NAME, _ = ...
+local ADDON_NAME, ns = ...
 local H, C, L = unpack(select(2,...))
 
+local Private = ns.Private
 local FlashFrame = H.FlashFrame
 local PerformanceCounter = H.PerformanceCounter
 
-local DefaultButtonVertexColor = {1, 1, 1}
-local DefaultButtonBackdropColor = {0.6, 0.6, 0.6}
-local DefaultButtonBackdropBorderColor = {0.1, 0.1, 0.1}
+local OriginButtonVertexColor = {1, 1, 1}
+local OriginButtonBackdropColor = {0.6, 0.6, 0.6}
+local OriginButtonBackdropBorderColor = {0.1, 0.1, 0.1}
 
 local ActivatePrimarySpecSpellName = GetSpellInfo(63645)
 local ActivateSecondarySpecSpellName = GetSpellInfo(63644)
 
 local UpdateDelay = 0.2
+
+local HealiumInitialized = false
 
 local SpecSettings = nil
 
@@ -41,39 +45,13 @@ local SpecSettings = nil
 -------------------------------------------------------
 -- Helpers
 -------------------------------------------------------
-local function Message(...)
-	print("HealiumCore:", ...)
-end
-
-local function ERROR(...)
-	print("|CFFFF0000HealiumCore|r:",...)
-end
-
-local function WARNING(...)
-	print("|CFF00FFFFHealiumCore|r:",...)
-end
-
-local function DEBUG(lvl, ...)
-	if C.general.debug and C.general.debug >= lvl then
-		print("|CFF00FF00HC|r:",...)
-	end
-end
+local ERROR = Private.ERROR
+local WARNING = Private.WARNING
+local DEBUG = Private.DEBUG
 
 -- Get value or set to default if nil
 local function Getter(value, default)
 	return value == nil and default or value
-end
-
--- Format big number
-local function ShortValueNegative(v)
-	if v <= 999 then return v end
-	if v >= 1000000 then
-		local value = string.format("%.1fm", v/1000000)
-		return value
-	elseif v >= 1000 then
-		local value = string.format("%.1fk", v/1000)
-		return value
-	end
 end
 
 -- Get book spell id from spell name
@@ -102,16 +80,35 @@ local function IsSpellLearned(spellID)
 	return nil
 end
 
+-- Duplicate any object
+local function DeepCopy(object)
+    local lookup_table = {}
+    local function _copy(object)
+        if type(object) ~= "table" then
+            return object
+        elseif lookup_table[object] then
+            return lookup_table[object]
+        end
+        local new_table = {}
+        lookup_table[object] = new_table
+        for index, value in pairs(object) do
+            new_table[_copy(index)] = _copy(value)
+        end
+        return new_table
+    end
+    return _copy(object)
+end
+
 -------------------------------------------------------
 -- Settings
 -------------------------------------------------------
 -- Check spell settings
 local function CheckSpellSettings()
-	--DEBUG(1000,"CheckSpellSettings")
+	--H:DEBUG(1000,"CheckSpellSettings")
 	-- Check settings
 	if SpecSettings then
 		for _, spellSetting in ipairs(SpecSettings.spells) do
-			--DEBUG(1,"CheckSpellSettings:"..tostring(spellSetting.spellID).."  "..tostring(spellSetting.macroName))
+			--H:DEBUG(1,"CheckSpellSettings:"..tostring(spellSetting.spellID).."  "..tostring(spellSetting.macroName))
 			if spellSetting.spellID and not IsSpellLearned(spellSetting.spellID) then
 				local name = GetSpellInfo(spellSetting.spellID)
 				if name then
@@ -132,7 +129,7 @@ local function GetSpecSettings()
 	if not C[H.myclass] then return end
 	local ptt = GetPrimaryTalentTree()
 	if not ptt then return end
-	--DEBUG(1, "GetSpecSettings done:"..ptt)
+	--H:DEBUG(1, "GetSpecSettings done:"..ptt)
 	SpecSettings = C[H.myclass][ptt]
 	--CheckSpellSettings()
 end
@@ -142,12 +139,13 @@ local function ResetSpecSettings()
 end
 
 -- Create a list with spellID and spellName from a list of spellID (+ remove duplicates)
-local function CreateDebuffFilterList(listName, list)
+local function CreateFilterList(listName, list)
 	local newList = {}
-	local i = 1
 	local index = 1
-	while i <= #list do
-		local spellName = GetSpellInfo(list[i])
+	for key, value in pairs(list) do
+		local spellID = type(value) == "table" and value[1] or value
+		local priority = type(value) == "table" and value[2] or nil
+		local spellName = GetSpellInfo(spellID)
 		if spellName then
 			-- Check for duplicate
 			local j = 1
@@ -161,18 +159,27 @@ local function CreateDebuffFilterList(listName, list)
 			end
 			if not found then
 				-- Create entry in new list
-				newList[index] = {spellID = list[i], spellName = spellName}
+				if priority then
+					newList[index] = {spellID = spellID, spellName = spellName, priority = priority}
+				else
+					newList[index] = {spellID = spellID, spellName = spellName}
+				end
 				index = index + 1
 			-- else
 				-- -- Duplicate found
 				-- WARNING(string.format(L.SETTINGS_DUPLICATEBUFFDEBUFF, list[i], newList[j].spellID, spellName, listName))
 			end
-		else
+		--else
 			-- Unknown spell found
-			WARNING(string.format(L.SETTINGS_UNKNOWNBUFFDEBUFF, list[i], listName))
+			--WARNING(string.format(L.SETTINGS_UNKNOWNBUFFDEBUFF, list[i], listName))
 		end
-		i = i + 1
+		--i = i + 1
 	end
+
+	-- for k, v in pairs(newList) do
+		-- H:DEBUG(1000, listName..":"..tostring(k).." "..tostring(v.spellID).." "..tostring(v.priority).." "..tostring(v.spellName))
+	-- end
+
 	return newList
 end
 
@@ -185,19 +192,23 @@ local function InitializeSettings()
 		end
 	end
 
-	-- Fill blacklist and whitelist with spellName instead of spellID
+	-- Fill blacklist, whitelist, dispellable with spellName instead of spellID
 	if C.blacklist and C.general.debuffFilter == "BLACKLIST" then
-		C.blacklist = CreateDebuffFilterList("debuff blacklist", C.blacklist)
+		C.blacklist = CreateFilterList("debuff blacklist", C.blacklist)
 	else
-		--DEBUG(1000,"Clearing debuffBlacklist")
+		--H:DEBUG(1000,"Clearing debuffBlacklist")
 		C.blacklist = nil
 	end
 
 	if C.whitelist and C.general.debuffFilter == "WHITELIST" then
-		C.whitelist = CreateDebuffFilterList("debuff whitelist", C.whitelist)
+		C.whitelist = CreateFilterList("debuff whitelist", C.whitelist)
 	else
-		--DEBUG(1000,"Clearing debuffWhitelist")
+		--H:DEBUG(1000,"Clearing debuffWhitelist")
 		C.whitelist = nil
+	end
+
+	if C.dispellable then
+		C.dispellable = CreateFilterList("dispellable filter", C.dispellable)
 	end
 
 	-- Add spellName to spell list
@@ -293,7 +304,7 @@ end
 
 -- Loop among every valid with specified unit unitframe in party/raid and call a function
 local function ForEachUnitframeWithUnit(unit, fct, ...)
-	PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframeWithUnit")
+	--PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframeWithUnit")
 	if not Unitframes then return nil end
 	for _, frame in ipairs(Unitframes) do
 		if frame and frame.unit == unit then
@@ -304,7 +315,7 @@ end
 
 -- Loop among every valid unitframe in party/raid and call a function
 local function ForEachUnitframe(fct, ...)
-	PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframe")
+	--PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframe")
 	if not Unitframes then return end
 	for _, frame in ipairs(Unitframes) do
 		--if frame and frame:IsShown() then -- IsShown is false if /reloadui
@@ -316,7 +327,7 @@ end
 
 -- Loop among every valid unitframe in party/raid and call a function for each button[index]
 local function ForEachUnitframeButton(index, fct, ...)
-	PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframeButton")
+	--PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframeButton")
 	if not Unitframes then return end
 	for _, frame in ipairs(Unitframes) do
 		--if frame and frame:IsShown() then -- IsShown is false if /reloadui
@@ -333,7 +344,7 @@ end
 
 -- Loop among every unitframe even if not shown or unit is nil
 local function ForEachUnitframeEvenIfInvalid(fct, ...)
-	PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframeEvenIfInvalid")
+	--PerformanceCounter:Increment(ADDON_NAME, "ForEachUnitframeEvenIfInvalid")
 	if not Unitframes then return end
 	for _, frame in ipairs(Unitframes) do
 		if frame then
@@ -345,9 +356,73 @@ end
 -------------------------------------------------------
 -- Healium buttons/buff/debuffs update
 -------------------------------------------------------
+-- Update buff icon, id, unit, ...
+local function UpdateBuff(buff, id, unit, icon, count, duration, expirationTime)
+	-- id, unit: used by tooltip
+	buff:SetID(id)
+	buff.unit = unit
+	-- texture
+	buff.icon:SetTexture(icon)
+	-- count
+	if buff.count then
+		if count > 1 then
+			buff.count:SetText(count)
+			buff.count:Show()
+		else
+			buff.count:Hide()
+		end
+	end
+	-- cooldown
+	if buff.cooldown then
+		if duration and duration > 0 then
+			--H:DEBUG(1000, "BUFF ON")
+			local startTime = expirationTime - duration
+			buff.cooldown:SetCooldown(startTime, duration)
+		else
+			--H:DEBUG(1000, "BUFF OFF")
+			buff.cooldown:Hide()
+		end
+	end
+	-- show
+	buff:Show()
+end
 
--- Update healium button color depending on frame and button status
--- frame disabled -> color in dark red except rez if dead or ghost
+-- Update debuff icon, id, unit, ...
+local function UpdateDebuff(debuff, id, unit, icon, count, duration, expirationTime, debuffType)
+	-- id, unit: used by tooltip
+	debuff:SetID(id)
+	debuff.unit = unit
+	-- texture
+	debuff.icon:SetTexture(icon)
+	-- count
+	if debuff.count then
+		if count > 1 then
+			debuff.count:SetText(count)
+			debuff.count:Show()
+		else
+			debuff.count:Hide()
+		end
+	end
+	-- cooldown
+	if debuff.cooldown then
+		if duration and duration > 0 then
+			local startTime = expirationTime - duration
+			debuff.cooldown:SetCooldown(startTime, duration)
+			debuff.cooldown:Show()
+		else
+			debuff.cooldown:Hide()
+		end
+	end
+	-- debuff color
+	local debuffColor = debuffType and DebuffTypeColor[debuffType] or DebuffTypeColor["none"]
+	--H:DEBUG(1000,"debuffType: "..(debuffType or 'nil').."  debuffColor: "..(debuffColor and debuffColor.r or 'nil')..","..(debuffColor and debuffColor.g or 'nil')..","..(debuffColor and debuffColor.b or 'nil'))
+	debuff:SetBackdropBorderColor(debuffColor.r, debuffColor.g, debuffColor.b)
+	-- show
+	debuff:Show()
+end
+
+-- Update healium button color depending on frame status and button status
+-- frame disabled -> color in dark red except rez spell if dead or ghost
 -- out of range -> color in deep red
 -- disabled -> dark gray
 -- not usable -> color in medium red
@@ -379,15 +454,15 @@ local function UpdateButtonColor(frame, button, buttonSpellSetting)
 		-- --button:SetBackdropBorderColor(debuffColor.r, debuffColor.g, debuffColor.b)
 		button.texture:SetVertexColor(debuffColor.r, debuffColor.g, debuffColor.b)
 	else
-		button.texture:SetVertexColor(unpack(DefaultButtonVertexColor))
-		button:SetBackdropColor(unpack(DefaultButtonBackdropColor))
-		button:SetBackdropBorderColor(unpack(DefaultButtonBackdropBorderColor))
+		button.texture:SetVertexColor(unpack(OriginButtonVertexColor))
+		button:SetBackdropColor(unpack(OriginButtonBackdropColor))
+		button:SetBackdropBorderColor(unpack(OriginButtonBackdropBorderColor))
 	end
 end
 
 -- Update button OOR
 local function UpdateButtonOOR(frame, button, spellName, spellSetting)
-	PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonOOR")
+	--PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonOOR")
 	local inRange = IsSpellInRange(spellName, frame.unit)
 	if not inRange or inRange == 0 then
 		button.hOOR = true
@@ -399,19 +474,20 @@ end
 
 -- Update button OOM
 local function UpdateButtonOOM(frame, button, OOM, spellSetting)
-	PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonOOM")
+	--PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonOOM")
 	button.hOOM = OOM
 	UpdateButtonColor(frame, button, spellSetting)
 end
 
 -- Update button cooldown
 local function UpdateButtonCooldown(frame, button, start, duration, enabled)
-	PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonCooldown")
+	--PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonCooldown")
 	CooldownFrame_SetTimer(button.cooldown, start, duration, enabled)
 end
 
 -- Update frame buttons color
 local function UpdateFrameButtonsColor(frame)
+	PerformanceCounter:Increment(ADDON_NAME, "UpdateFrameButtonsColor")
 	if not frame.hButtons then return end
 	if not SpecSettings then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
@@ -429,18 +505,24 @@ local listDebuffs = {} -- GC-friendly
 local function UpdateFrameBuffsDebuffsPrereqs(frame)
 	PerformanceCounter:Increment(ADDON_NAME, "UpdateFrameBuffsDebuffsPrereqs")
 
-	--DEBUG(1000,"UpdateFrameBuffsDebuffsPrereqs: frame: "..frame:GetName().." unit: "..(unit or "nil"))
+	--H:DEBUG(1000,"UpdateFrameBuffsDebuffsPrereqs: frame: "..frame:GetName().." unit: "..(unit or "nil"))
 
 	local unit = frame.unit
 	if not unit then return end
 
 	-- reset button.hPrereqFailed and button.hDispelHighlight
 	if frame.hButtons and not frame.hDisabled then
-		--DEBUG(1000,"---- reset dispel, disabled")
+		--H:DEBUG(1000,"---- reset dispel, disabled")
 		for index, button in ipairs(frame.hButtons) do
 			button.hDispelHighlight = "none"
 			button.hPrereqFailed = false
 		end
+	end
+	-- reset priorityDebuff
+	if frame.hPriorityDebuff then
+		-- lower value ==> higher priority
+		frame.hPriorityDebuff.priority = 1000 -- lower priority
+		frame.hPriorityDebuff:Hide()
 	end
 
 	-- buff: parse buff even if showBuff is set to false for prereq
@@ -449,60 +531,36 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 		local buffIndex = 1
 		if SpecSettings then
 			for i = 1, 40, 1 do
-				-- get buff
-				name, _, icon, count, _, duration, expirationTime, _, _, _, spellID = UnitAura(unit, i, "PLAYER|HELPFUL")
-				if not name then
-					buffCount = i-1
-					break
-				end
+				-- get buff, don't filter on PLAYER because we need a full list of buff to check prereq
+				local name, _, icon, count, _, duration, expirationTime, unitCaster, _, _, spellID = UnitBuff(unit, i)
+				if not name then break end
 				listBuffs[i] = spellID -- display only buff castable by player but keep whole list of buff to check prereq
-				-- is buff casted by player and in spell list?
-				local found = false
-				for index, spellSetting in ipairs(SpecSettings.spells) do
-					if spellSetting.spellID and spellSetting.spellID == spellID then
-						found = true
-					elseif spellSetting.macroName then
-						local macroID = GetMacroIndexByName(spellSetting.macroName)
-						if macroID > 0 then
-							local spellName = GetMacroSpell(macroID)
-							if spellName == name then
-								found = true
+				buffCount = buffCount + 1
+				if unitCaster == "player" and frame.hBuffs and buffIndex <= C.general.maxBuffCount then -- only buff casted by player are shown
+					-- is buff casted by player and in spell list?
+					local found = false
+					for index, spellSetting in ipairs(SpecSettings.spells) do
+						if spellSetting.spellID and spellSetting.spellID == spellID then
+							found = true
+							break
+						elseif spellSetting.macroName then
+							local macroID = GetMacroIndexByName(spellSetting.macroName)
+							if macroID > 0 then
+								local spellName = GetMacroSpell(macroID)
+								if spellName == name then
+									found = true
+									break
+								end
 							end
 						end
 					end
-				end
-				if found and frame.hBuffs then
-					-- buff casted by player and in spell list
-					local buff = frame.hBuffs[buffIndex]
-					-- id, unit  used by tooltip
-					buff:SetID(i)
-					buff.unit = unit
-					-- texture
-					buff.icon:SetTexture(icon)
-					-- count
-					if count > 1 then
-						buff.count:SetText(count)
-						buff.count:Show()
-					else
-						buff.count:Hide()
-					end
-					-- cooldown
-					if duration and duration > 0 then
-						--DEBUG(1000, "BUFF ON")
-						local startTime = expirationTime - duration
-						buff.cooldown:SetCooldown(startTime, duration)
-					else
-						--DEBUG(1000, "BUFF OFF")
-						buff.cooldown:Hide()
-					end
-					-- show
-					buff:Show()
-					-- next buff
-					buffIndex = buffIndex + 1
-					-- too many buff?
-					if buffIndex > C.general.maxBuffCount then
+					if found then
+						-- buff casted by player and in spell list
+						local buff = frame.hBuffs[buffIndex]
+						UpdateBuff(buff, i, unit, icon, count, duration, expirationTime)
+						-- next buff
+						buffIndex = buffIndex + 1
 						--WARNING(string.format(L.BUFFDEBUFF_TOOMANYBUFF, frame:GetName(), unit))
-						break
 					end
 				end
 			end
@@ -516,26 +574,30 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 		end
 	end
 
-	-- debuff: parse debuff even if showDebuff is set to false for prereq
+	-- debuff: parse debuff even if showDebuff is set to false for prereq and even if frame is disabled
 	local debuffCount = 0
 	local debuffIndex = 1
+	local dispellableFound = false
 	if SpecSettings or C.general.showDebuff then
 		for i = 1, 40, 1 do
 			-- get debuff
 			local name, _, icon, count, debuffType, duration, expirationTime, _, _, _, spellID = UnitDebuff(unit, i)
-			if not name then
-				debuffCount = i-1
-				break
+			if not name then break end
+			local debuffPriority = 1000 -- lowest priority
+			if C.general.debugDebuff then
+				debuffType = C.general.debugDebuff -- DEBUG purpose :)
 			end
-			--debuffType = "Curse" -- DEBUG purpose :)
-			listDebuffs[i] = {spellID = spellID, type = debuffType} -- display not filtered debuff but keep whole debuff list to check prereq
+			listDebuffs[i] = {spellID = spellID, type = debuffType, spellName = name} -- display not filtered debuff but keep whole debuff list to check prereq and highlight dispel buttons
+			debuffCount = debuffCount + 1
 			local dispellable = false -- default: non-dispellable
 			if debuffType then
 				for _, spellSetting in ipairs(SpecSettings.spells) do
 					if spellSetting.dispels then
 						local canDispel = type(spellSetting.dispels[debuffType]) == "function" and spellSetting.dispels[debuffType]() or spellSetting.dispels[debuffType]
 						if canDispel then
+							debuffPriority = 0 -- highest priority
 							dispellable = true
+							dispellableFound = true
 							break
 						end
 					end
@@ -560,47 +622,28 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 					filtered = true -- default: filtered
 					for _, entry in ipairs(C.whitelist) do
 						if entry.spellName == name then
+							debuffPriority = entry.priority or 1000
 							filtered = false -- found in whitelist -> not filtered
 							break
 						end
 					end
 				end
 			end
-			if not filtered and frame.hDebuffs then
+			if not filtered then
 				-- debuff not filtered
-				local debuff = frame.hDebuffs[debuffIndex]
-				-- id, unit  used by tooltip
-				debuff:SetID(i)
-				debuff.unit = unit
-				-- texture
-				debuff.icon:SetTexture(icon)
-				-- count
-				if count > 1 then
-					debuff.count:SetText(count)
-					debuff.count:Show()
-				else
-					debuff.count:Hide()
-				end
-				-- cooldown
-				if duration and duration > 0 then
-					local startTime = expirationTime - duration
-					debuff.cooldown:SetCooldown(startTime, duration)
-					debuff.cooldown:Show()
-				else
-					debuff.cooldown:Hide()
-				end
-				-- debuff color
-				local debuffColor = debuffType and DebuffTypeColor[debuffType] or DebuffTypeColor["none"]
-				--DEBUG(1000,"debuffType: "..(debuffType or 'nil').."  debuffColor: "..(debuffColor and debuffColor.r or 'nil')..","..(debuffColor and debuffColor.g or 'nil')..","..(debuffColor and debuffColor.b or 'nil'))
-				debuff:SetBackdropBorderColor(debuffColor.r, debuffColor.g, debuffColor.b)
-				-- show
-				debuff:Show()
-				-- next debuff
-				debuffIndex = debuffIndex + 1
-				--- too many debuff?
-				if debuffIndex > C.general.maxDebuffCount then
+				if frame.hDebuffs and debuffIndex <= C.general.maxDebuffCount then
+					-- set normal debuff
+					local debuff = frame.hDebuffs[debuffIndex]
+					UpdateDebuff(debuff, i, unit, icon, count, duration, expirationTime, debuffType)
+					-- next debuff
+					debuffIndex = debuffIndex + 1
+					--- too many debuff?
 					--WARNING(string.format(L.BUFFDEBUFF_TOOMANYDEBUFF, frame:GetName(), unit))
-					break
+				end
+				if frame.hPriorityDebuff and debuffPriority <= frame.hPriorityDebuff.priority then
+					-- set priority debuff if any
+					UpdateDebuff(frame.hPriorityDebuff, i, unit, icon, count, duration, expirationTime, debuffType)
+					frame.hPriorityDebuff.priority = debuffPriority
 				end
 			end
 		end
@@ -613,29 +656,28 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 		end
 	end
 
-	--DEBUG(1000,"BUFF:"..buffCount.."  DEBUFF:"..debuffCount)
+	--H:DEBUG(1000,"BUFF:"..buffCount.."  DEBUFF:"..debuffCount)
 
-	-- color dispel button if dispellable debuff + prereqs management (is buff or debuff a prereq to enable/disable a spell)
+	-- color dispel button if dispellable debuff (and not in dispellable filter list) + prereqs management (is buff or debuff a prereq to enable/disable a spell)
 	if SpecSettings and frame.hButtons and not frame.hDisabled then
 		local isUnitInRange = UnitInRange(unit)
-		local debuffDispellableFound = false
 		local highlightDispel = Getter(C.general.highlightDispel, true)
-		local playSound = Getter(C.general.playSoundOnDispel, true)
-		local flashStyle = C.general.flashStyle
+		local playSound = false -- play sound only if at least one debuff dispellable not filtered and option activated
+		local dispelAnimation = C.general.dispelAnimation
 		for index, spellSetting in ipairs(SpecSettings.spells) do
 			local button = frame.hButtons[index]
 			-- buff prereq: if not present, spell is inactive
 			if spellSetting.buffs then
-				--DEBUG(1000,"searching buff prereq for "..spellSetting.spellID)
+				--H:DEBUG(1000,"searching buff prereq for "..spellSetting.spellID)
 				local prereqBuffFound = false
 				for _, prereqBuffSpellID in ipairs(spellSetting.buffs) do
-					--DEBUG(1000,"buff prereq for "..spellSetting.spellID.." "..prereqBuffSpellID)
+					--H:DEBUG(1000,"buff prereq for "..spellSetting.spellID.." "..prereqBuffSpellID)
 					--for _, buff in pairs(listBuffs) do
 					for i = 1, buffCount, 1 do
 						local buff = listBuffs[i]
-						--DEBUG(1000,"buff on unit "..buffSpellID)
+						--H:DEBUG(1000,"buff on unit "..buffSpellID)
 						if buff == prereqBuffSpellID then
-							--DEBUG(1000,"PREREQ: "..prereqBuffSpellID.." is a buff prereq for "..spellSetting.spellID.." "..button:GetName())
+							--H:DEBUG(1000,"PREREQ: "..prereqBuffSpellID.." is a buff prereq for "..spellSetting.spellID.." "..button:GetName())
 							prereqBuffFound = true
 							break
 						end
@@ -643,23 +685,23 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 					if prereqBuffFound then break end
 				end
 				if not prereqBuffFound then
-					--DEBUG(1000,"PREREQ: BUFF for "..spellSetting.spellID.." NOT FOUND")
+					--H:DEBUG(1000,"PREREQ: BUFF for "..spellSetting.spellID.." NOT FOUND")
 					button.hPrereqFailed = true
 				end
 			end
 			-- debuff prereq: if present, spell is inactive
 			if spellSetting.debuffs then
-				--DEBUG(1000,"searching buff prereq for "..spellSetting.spellID)
+				--H:DEBUG(1000,"searching buff prereq for "..spellSetting.spellID)
 				local prereqDebuffFound = false
 				for _, prereqDebuffSpellID in ipairs(spellSetting.debuffs) do
-					--DEBUG(1000,"buff prereq for "..spellSetting.spellID.." "..prereqDebuffSpellID)
+					--H:DEBUG(1000,"buff prereq for "..spellSetting.spellID.." "..prereqDebuffSpellID)
 					--for _, debuff in ipairs(listDebuffs) do
 					for i = 1, debuffCount, 1 do
 						local debuff = listDebuffs[i]
 						local debuffSpellID = debuff.spellID -- [1] = spellID
-						--DEBUG(1000,"debuff on unit "..debuffSpellID)
+						--H:DEBUG(1000,"debuff on unit "..debuffSpellID)
 						if debuffSpellID == prereqDebuffSpellID then
-							--DEBUG(1000,"PREREQ: "..prereqDebuffSpellID.." is a debuff prereq for "..spellSetting.spellID.." "..button:GetName())
+							--H:DEBUG(1000,"PREREQ: "..prereqDebuffSpellID.." is a debuff prereq for "..spellSetting.spellID.." "..button:GetName())
 							prereqDebuffFound = true
 							break
 						end
@@ -667,51 +709,63 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 					if prereqDebuffFound then break end
 				end
 				if prereqDebuffFound then
-					--DEBUG(1000,"PREREQ: DEBUFF for "..spellSetting.spellID.." FOUND")
+					--H:DEBUG(1000,"PREREQ: DEBUFF for "..spellSetting.spellID.." FOUND")
 					button.hPrereqFailed = true
 				end
 			end
 			-- color dispel button if affected by a debuff curable by a player spell
-			if spellSetting.dispels and (highlightDispel or playSound or flashStyle ~= "NONE") then
+			if dispellableFound and spellSetting.dispels and (highlightDispel or dispelAnimation ~= "NONE") then
 				--for _, debuff in ipairs(listDebuffs) do
 				for i = 1, debuffCount, 1 do
 					local debuff = listDebuffs[i]
 					local debuffType = debuff.type -- [2] = debuffType
+					local debuffName = debuff.spellName
 					if debuffType then
-						--DEBUG(1000,"type: "..type(spellSetting.dispels[debuffType]))
-						local canDispel = type(spellSetting.dispels[debuffType]) == "function" and spellSetting.dispels[debuffType]() or spellSetting.dispels[debuffType]
-						if canDispel then
-							--print("DEBUFF dispellable")
-							local debuffColor = DebuffTypeColor[debuffType] or DebuffTypeColor["none"]
-							-- Highlight dispel button?
-							if highlightDispel then
-								button.hDispelHighlight = debuffType
-							end
-							-- Flash dispel?
-							if isUnitInRange then
-								if flashStyle == "FLASH" then
-									FlashFrame:ShowFlashFrame(button, debuffColor, 320, 100, false)
-								elseif flashStyle == "FADEOUT" then
-									FlashFrame:Fadeout(button, 0.3)
+						local filtered = false
+						if C.dispellable then
+							for _, entry in ipairs(C.dispellable) do
+								if entry.spellName == debuffName then
+									filtered = true
+									break
 								end
 							end
-							debuffDispellableFound = true
-							break -- a debuff dispellable is enough
+						end
+						if not filtered then
+							playSound = Getter(C.general.playSoundOnDispel, true) -- play sound only if at least one debuff dispellable not filtered and option activated
+							--H:DEBUG(1000,"type: "..type(spellSetting.dispels[debuffType]))
+							local canDispel = type(spellSetting.dispels[debuffType]) == "function" and spellSetting.dispels[debuffType]() or spellSetting.dispels[debuffType]
+							if canDispel then
+								--print("DEBUFF dispellable")
+								local debuffColor = DebuffTypeColor[debuffType] or DebuffTypeColor["none"]
+								-- Highlight dispel button?
+								if highlightDispel then
+									button.hDispelHighlight = debuffType
+								end
+								-- Flash dispel?
+								if isUnitInRange then
+									if dispelAnimation == "FLASH" then
+										FlashFrame:ShowFlashFrame(button, debuffColor, 320, 100, false)
+									elseif dispelAnimation == "BLINK" then
+										FlashFrame:Blink(button, 0.3)
+									elseif dispelAnimation == "PULSE" then
+										FlashFrame:Pulse(button, 1.75)
+									end
+								end
+								break -- a debuff dispellable is enough
+							end
 						end
 					end
 				end
 			end
 		end
-		if debuffDispellableFound then
-			-- Play sound?
-			if playSound and isUnitInRange then
-				local now = GetTime()
-				--print("DEBUFF in range: "..now.."  "..h_listDebuffsoundTime)
-				if now > LastDebuffSoundTime + 7 then -- no more than once every 7 seconds
-					--print("DEBUFF in time")
-					PlaySoundFile(C.general.dispelSoundFile)
-					LastDebuffSoundTime = now
-				end
+		-- Play sound?
+		if playSound and isUnitInRange then
+			local now = GetTime()
+			--print("DEBUFF in range: "..now.."  "..h_listDebuffsoundTime)
+			if now > LastDebuffSoundTime + 7 then -- no more than once every 7 seconds
+				--print("DEBUFF in time")
+				PlaySoundFile(C.general.dispelSoundFile)
+				LastDebuffSoundTime = now
 			end
 		end
 	end
@@ -729,14 +783,14 @@ local function UpdateFrameDisableStatus(frame)
 	local unit = frame.unit
 	if not unit then return end
 
-	--DEBUG(1000,"UpdateFrameVisibility: "..frame:GetName().."  "..(unit or 'nil'))
+	--H:DEBUG(1000,"UpdateFrameVisibility: "..frame:GetName().."  "..(unit or 'nil'))
 	if not UnitIsConnected(unit) or UnitIsDeadOrGhost(unit) then
 		if not frame.hDisabled then
-			--DEBUG(1000,"->DISABLE")
+			--H:DEBUG(1000,"->DISABLE")
 			frame.hDisabled = true
 			-- hide buff
 			if frame.hBuffs then
-				--DEBUG(1000,"disable healium buffs")
+				--H:DEBUG(1000,"disable healium buffs")
 				for _, buff in ipairs(frame.hBuffs) do
 					buff:Hide()
 				end
@@ -746,7 +800,7 @@ local function UpdateFrameDisableStatus(frame)
 			end
 		end
 	elseif frame.hDisabled then
-		--DEBUG(1000,"DISABLED")
+		--H:DEBUG(1000,"DISABLED")
 		frame.hDisabled = false
 		if SpecSettings then
 			UpdateFrameButtonsColor(frame)
@@ -757,8 +811,8 @@ end
 -- For each spell, get cooldown then loop among Healium Unitframes and set cooldown
 local lastCD = {} -- keep a list of CD between calls, if CD information are the same, no need to update buttons
 local function UpdateCooldowns()
-	PerformanceCounter:Increment(ADDON_NAME, "UpdateCooldowns")
-	--DEBUG(1000,"UpdateCooldowns")
+	--PerformanceCounter:Increment(ADDON_NAME, "UpdateCooldowns")
+	--H:DEBUG(1000,"UpdateCooldowns")
 	if not SpecSettings then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local start, duration, enabled
@@ -775,14 +829,17 @@ local function UpdateCooldowns()
 		if start and start > 0 then
 			local arrayEntry = lastCD[index]
 			if not arrayEntry or arrayEntry.start ~= start or arrayEntry.duration ~= duration then
-				--DEBUG(1000,"CD KEEP:"..index.."  "..start.."  "..duration.."  /  "..(arrayEntry and arrayEntry.start or 'nil').."  "..(arrayEntry and arrayEntry.duration or 'nil'))
+				PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonCooldown by frame")
+				--H:DEBUG(1000,"CD KEEP:"..index.."  "..start.."  "..duration.."  /  "..(arrayEntry and arrayEntry.start or 'nil').."  "..(arrayEntry and arrayEntry.duration or 'nil'))
 				ForEachUnitframeButton(index, UpdateButtonCooldown, start, duration, enabled)
 				lastCD[index] = {start = start, duration = duration}
-			--else
-				--DEBUG(1000,"CD SKIP:"..index.."  "..start.."  "..duration.."  /  "..(arrayEntry and arrayEntry.start or 'nil').."  "..(arrayEntry and arrayEntry.duration or 'nil'))
+			else
+				PerformanceCounter:Increment(ADDON_NAME, "SKIP UpdateButtonCooldown by frame")
+				--H:DEBUG(1000,"CD SKIP:"..index.."  "..start.."  "..duration.."  /  "..(arrayEntry and arrayEntry.start or 'nil').."  "..(arrayEntry and arrayEntry.duration or 'nil'))
 			end
-		-- else
-			-- DEBUG(1000,"CD: skipping:"..index)
+		else
+			PerformanceCounter:Increment(ADDON_NAME, "INVALID UpdateButtonCooldown by frame")
+			-- H:DEBUG(1000,"CD: skipping:"..index)
 		end
 	end
 end
@@ -790,8 +847,8 @@ end
 -- Check OOM spells
 local lastOOM = {} -- keep OOM status of previous step, if no change, no need to update butttons
 local function UpdateOOMSpells()
-	PerformanceCounter:Increment(ADDON_NAME, "UpdateOOMSpells")
-	--DEBUG(1000,"UpdateOOMSpells")
+	--PerformanceCounter:Increment(ADDON_NAME, "UpdateOOMSpells")
+	--H:DEBUG(1000,"UpdateOOMSpells")
 	if not SpecSettings then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local spellName = spellSetting.spellName -- spellName is automatically set if spellID was found in settings
@@ -802,13 +859,15 @@ local function UpdateOOMSpells()
 			end
 		end
 		if spellName then
-			--DEBUG(1000,"spellName:"..spellName)
+			--H:DEBUG(1000,"spellName:"..spellName)
 			local _, OOM = IsUsableSpell(spellName)
 			if lastOOM[index] ~= OOM then
+				PerformanceCounter:Increment(ADDON_NAME, "UpdateButtonOOM by frame")
 				ForEachUnitframeButton(index, UpdateButtonOOM, OOM, spellSetting)
 				lastOOM[index] = OOM
-			-- else
-				-- DEBUG(1000,"Skipping UpdateButtonOOM:"..index)
+			else
+				PerformanceCounter:Increment(ADDON_NAME, "SKIP UpdateButtonOOM by frame")
+				-- H:DEBUG(1000,"Skipping UpdateButtonOOM:"..index)
 			end
 		end
 	end
@@ -817,7 +876,7 @@ end
 -- Check OOR spells
 local function UpdateOORSpells()
 	PerformanceCounter:Increment(ADDON_NAME, "UpdateOORSpells")
-	--DEBUG(1000,"UpdateOORSpells")
+	--H:DEBUG(1000,"UpdateOORSpells")
 	if not SpecSettings then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local spellName = spellSetting.spellName -- spellName is automatically set if spellID was found in settings
@@ -828,7 +887,7 @@ local function UpdateOORSpells()
 			end
 		end
 		if spellName then
-			--DEBUG(1000,"spellName:"..spellName)
+			--H:DEBUG(1000,"spellName:"..spellName)
 			ForEachUnitframeButton(index, UpdateButtonOOR, spellName, spellSetting)
 		end
 	end
@@ -838,15 +897,15 @@ end
 local function UpdateFrameDebuffsPosition(frame)
 	PerformanceCounter:Increment(ADDON_NAME, "UpdateFrameDebuffsPosition")
 	if not frame.hDebuffs or not frame.hButtons then return end
-	--DEBUG(1000,"UpdateFrameDebuffsPosition")
-	--DEBUG(1000,"Update debuff position for "..frame:GetName())
+	--H:DEBUG(1000,"UpdateFrameDebuffsPosition")
+	--H:DEBUG(1000,"Update debuff position for "..frame:GetName())
 	local anchor = frame
 	if SpecSettings then -- if no heal buttons, anchor to unitframe
 		anchor = frame.hButtons[#SpecSettings.spells]
 	end
-	--DEBUG(1000,"Update debuff position for "..frame:GetName().." anchoring on "..anchor:GetName())
+	--H:DEBUG(1000,"Update debuff position for "..frame:GetName().." anchoring on "..anchor:GetName())
 	local firstDebuff = frame.hDebuffs[1]
-	--DEBUG(1000,"anchor: "..anchor:GetName().."  firstDebuff: "..firstDebuff:GetName())
+	--H:DEBUG(1000,"anchor: "..anchor:GetName().."  firstDebuff: "..firstDebuff:GetName())
 	local debuffSpacing = C.general.debuffSpacing or 2
 	firstDebuff:ClearAllPoints()
 	firstDebuff:SetPoint("TOPLEFT", anchor, "TOPRIGHT", debuffSpacing, 0)
@@ -856,10 +915,10 @@ end
 local function UpdateFrameButtonsAttributes(frame)
 	PerformanceCounter:Increment(ADDON_NAME, "UpdateFrameButtonsAttributes")
 	if InCombatLockdown() then return end
-	--DEBUG(1000,"Update frame buttons for "..frame:GetName())
+	--H:DEBUG(1000,"Update frame buttons for "..frame:GetName())
 	if not frame.hButtons then return end
 	for i, button in ipairs(frame.hButtons) do
-		--DEBUG(1000,"UpdateFrameButtonsAttributes:"..tostring(SpecSettings))--.."  "..(SpecSettings and SpecSettings.spells and tostring(#SpecSettings.spells) or "nil").."  "..i)
+		--H:DEBUG(1000,"UpdateFrameButtonsAttributes:"..tostring(SpecSettings))--.."  "..(SpecSettings and SpecSettings.spells and tostring(#SpecSettings.spells) or "nil").."  "..i)
 		if SpecSettings and i <= #SpecSettings.spells then
 			local spellSetting = SpecSettings.spells[i]
 			local icon, name, type
@@ -888,13 +947,13 @@ local function UpdateFrameButtonsAttributes(frame)
 				end
 			end
 			if type and name and icon then
-				--DEBUG(1000,"show button "..i.." "..frame:GetName().."  "..name)
+				--H:DEBUG(1000,"show button "..i.." "..frame:GetName().."  "..name)
 				button.texture:SetTexture(icon)
 				button:SetAttribute("type", type)
 				button:SetAttribute(type, name)
 				button.hInvalid = false
 			else
-				--DEBUG(1000,"invalid button "..i.." "..frame:GetName())
+				--H:DEBUG(1000,"invalid button "..i.." "..frame:GetName())
 				button.hInvalid = true
 				button.hSpellBookID = spellSetting.spellID
 				button.hMacroName = spellSetting.macroName
@@ -903,7 +962,7 @@ local function UpdateFrameButtonsAttributes(frame)
 			end
 			button:Show()
 		else
-			--DEBUG(1000,"hide button "..i.." "..frame:GetName())
+			--H:DEBUG(1000,"hide button "..i.." "..frame:GetName())
 			button.hInvalid = true
 			button.hSpellBookID = nil
 			button.hMacroName = nil
@@ -921,9 +980,9 @@ local DelayedButtonsCreation = {}
 local function CreateHealiumButtons(frame)
 	if frame.hButtons then return end
 
-	--DEBUG(1000,"CreateHealiumButtons")
+	--H:DEBUG(1000,"CreateHealiumButtons")
 	if InCombatLockdown() then
-		--DEBUG(1000,"CreateHealiumButtons: delayed creation of frame "..frame:GetName())
+		--H:DEBUG(1000,"CreateHealiumButtons: delayed creation of frame "..frame:GetName())
 		tinsert(DelayedButtonsCreation, frame)
 		return
 	end
@@ -934,22 +993,24 @@ local function CreateHealiumButtons(frame)
 	for i = 1, C.general.maxButtonCount, 1 do
 		-- name
 		local buttonName = frame:GetName().."_HealiumButton_"..i
+		-- anchor
 		local anchor
 		if i == 1 then
 			anchor = {"TOPLEFT", frame, "TOPRIGHT", buttonSpacing, 0}
 		else
 			anchor = {"TOPLEFT", frame.hButtons[i-1], "TOPRIGHT", buttonSpacing, 0}
 		end
+		-- frame
 		local button = H:CreateHealiumButton(frame, buttonName, buttonSize, anchor)
 		assert(button.cooldown, "Missing cooldown on HealiumButton:"..buttonName) -- TODO: localization
 		assert(button.texture, "Missing texture on HealiumButton:"..buttonName) -- TODO: localization
 		local vr, vg, vb = button.texture:GetVertexColor()
-		DefaultButtonVertexColor = vr and {vr, vg, vb} or DefaultButtonVertexColor
+		OriginButtonVertexColor = vr and {vr, vg, vb} or OriginButtonVertexColor
 		local br, bg, bb = button:GetBackdropColor()
-		DefaultButtonBackdropColor = br and {br, bg, bb} or DefaultButtonBackdropColor
+		OriginButtonBackdropColor = br and {br, bg, bb} or OriginButtonBackdropColor
 		local bbr, bbg, bbb = button:GetBackdropBorderColor()
-		DefaultButtonBackdropBorderColor = bbr and {bbr, bbg, bbb} or DefaultButtonBackdropBorderColor
-		-- click event/action, attributes 'type' and 'spell' are set in UpdateFrameButtons
+		OriginButtonBackdropBorderColor = bbr and {bbr, bbg, bbb} or OriginButtonBackdropBorderColor
+		-- click event/action, attributes 'type' and 'spell' are set in UpdateFrameButtonsAttributes
 		button:RegisterForClicks("AnyUp")
 		button:SetAttribute("useparent-unit","true")
 		button:SetAttribute("*unit2", "target")
@@ -978,20 +1039,22 @@ end
 local function CreateHealiumDebuffs(frame)
 	if frame.hDebuffs then return end
 
-	--DEBUG(1000,"CreateHealiumDebuffs:"..frame:GetName())
+	--H:DEBUG(1000,"CreateHealiumDebuffs:"..frame:GetName())
 	frame.hDebuffs = {}
 	local debuffSize = frame:GetHeight()
 	local debuffSpacing = C.general.debuffSpacing or 2
 	for i = 1, C.general.maxDebuffCount, 1 do
-		--DEBUG(1000,"Create debuff "..i)
+		--H:DEBUG(1000,"Create debuff "..i)
 		-- name
 		local debuffName = frame:GetName().."_HealiumDebuff_"..i
+		-- anchor
 		local anchor
 		if i == 1 then
 			anchor = {"TOPLEFT", frame, "TOPRIGHT", debuffSpacing, 0}
 		else
 			anchor = {"TOPLEFT", frame.hDebuffs[i-1], "TOPRIGHT", debuffSpacing, 0}
 		end
+		-- frame
 		local debuff = H:CreateHealiumDebuff(frame, debuffName, debuffSize, anchor)
 		assert(debuff.icon, "Missing icon on HealiumDebuff:"..debuffName) -- TODO: localization
 		assert(debuff.cooldown, "Missing cooldown on HealiumDebuff:"..debuffName) -- TODO: localization
@@ -1015,18 +1078,21 @@ local function CreateHealiumBuffs(frame)
 	if not frame then return end
 	if frame.hBuffs then return end
 
-	--DEBUG(1000,"CreateHealiumBuffs:"..frame:GetName())
+	--H:DEBUG(1000,"CreateHealiumBuffs:"..frame:GetName())
 	frame.hBuffs = {}
 	local buffSize = frame:GetHeight()
 	local buffSpacing = C.general.buffSpacing or 2
 	for i = 1, C.general.maxBuffCount, 1 do
+		-- name
 		local buffName = frame:GetName().."_HealiumBuff_"..i
+		-- anchor
 		local anchor
 		 if i == 1 then
 			anchor = {"TOPRIGHT", frame, "TOPLEFT", -buffSpacing, 0}
 		else
 			anchor = {"TOPRIGHT", frame.hBuffs[i-1], "TOPLEFT", -buffSpacing, 0}
 		end
+		-- frame
 		local buff = H:CreateHealiumBuff(frame, buffName, buffSize, anchor)
 		assert(buff.icon, "Missing icon on HealiumBuff:"..buffName) -- TODO: localization
 		assert(buff.cooldown, "Missing cooldown on HealiumBuff:"..buffName) -- TODO: localization
@@ -1048,23 +1114,44 @@ end
 -- Create delayed buttons
 local function CreateDelayedButtons()
 	if InCombatLockdown() then return false end
-	--DEBUG(1000,"CreateDelayedButtons:"..tostring(DelayedButtonsCreation).."  "..(#DelayedButtonsCreation))
+	--H:DEBUG(1000,"CreateDelayedButtons:"..tostring(DelayedButtonsCreation).."  "..(#DelayedButtonsCreation))
 	if not DelayedButtonsCreation or #DelayedButtonsCreation == 0 then return false end
 
 	for _, frame in ipairs(DelayedButtonsCreation) do
-		--DEBUG(1000,"Delayed frame creation for "..frame:GetName())
+		--H:DEBUG(1000,"Delayed frame creation for "..frame:GetName())
 		if not frame.hButtons then
 			CreateHealiumButtons(frame)
 		--else
-			--DEBUG(1000,"Frame already created for "..frame:GetName())
+			--H:DEBUG(1000,"Frame already created for "..frame:GetName())
 		end
 	end
 	DelayedButtonsCreation = {}
 	return true
 end
 
--- Add healium components to a frame
-function H:AddHealiumComponents(frame)
+-- Create unique debuff frame showing most important debuff
+local function CreateHealiumPriorityDebuff(frame)
+	if frame.hPriorityDebuff then return end
+	local anchor = {"CENTER", frame, "CENTER", 10, 0}
+	local size = frame:GetHeight()-6
+	local debuffName = frame:GetName().."_HealiumPriorityDebuff"
+	--local debuff = CreateFrame("Frame", debuffName, frame)
+	local debuff = H:CreateHealiumDebuff(frame, debuffName, size, anchor)
+	assert(debuff.icon, "Missing icon on HealiumDebuff:"..debuffName) -- TODO: localization
+	assert(debuff.cooldown, "Missing cooldown on HealiumDebuff:"..debuffName) -- TODO: localization
+	assert(debuff.count, "Missing count on HealiumDebuff:"..debuffName) -- TODO: localization
+	debuff:SetFrameLevel(8)
+	debuff:SetFrameStrata("MEDIUM") -- "BACKGROUND"
+	debuff:SetAlpha(0.7)
+	debuff:Hide()
+
+	frame.hPriorityDebuff = debuff
+end
+
+-- Register a frame in Healium
+function H:RegisterFrame(frame)
+	if not HealiumInitialized then return false end
+
 	-- heal buttons
 	CreateHealiumButtons(frame)
 
@@ -1072,191 +1159,26 @@ function H:AddHealiumComponents(frame)
 	if C.general.showDebuff then
 		CreateHealiumDebuffs(frame)
 	end
-
+	if C.general.showPriorityDebuff then
+		CreateHealiumPriorityDebuff(frame) -- TEST
+	end
 	-- healium buffs
 	if C.general.showBuff then
 		CreateHealiumBuffs(frame)
 	end
-
 	-- update healium buttons visibility, icon and attributes + reposition debuff
 	if SpecSettings then
 		UpdateFrameButtonsAttributes(frame)
 		-- update debuff position
 		UpdateFrameDebuffsPosition(frame)
 	end
-
 	-- custom
 	frame.hDisabled = false
 
 	-- save frame in healium frame list
 	SaveUnitframe(frame)
-end
 
--------------------------------------------------------
--- Handle healium specific events
--------------------------------------------------------
-local function DisableHealium(handler)
-	handler.hRespecing = nil
-	handler:UnregisterAllEvents()
-	handler:RegisterEvent("PLAYER_TALENT_UPDATE")
-	ForEachUnitframeEvenIfInvalid(
-		function(frame)
-			-- disable buttons
-			if frame.hButtons then
-				for i = 1, C.general.maxButtonCount, 1 do
-					local button = frame.hButtons[i]
-					button.hInvalid = true
-					button.hSpellBookID = nil
-					button.hMacroName = nil
-					button.texture:SetTexture("")
-					button:Hide()
-				end
-			end
-			-- disable buffs
-			if frame.hBuffs then
-				for i = 1, C.general.maxBuffCount, 1 do
-					local buff = frame.hBuffs[i]
-					buff.Hide()
-				end
-			end
-			-- disable debuffs
-			if frame.hDebuffs then
-				for i = 1, C.general.maxDebuffCount, 1 do
-					local debuff = frame.hDebuffs[i]
-					debuff.Hide()
-				end
-			end
-		end
-	)
-end
-
-local function EnableHealium(handler)
-	handler:RegisterEvent("RAID_ROSTER_UPDATE")
-	handler:RegisterEvent("PARTY_MEMBERS_CHANGED")
-	handler:RegisterEvent("PLAYER_REGEN_ENABLED")
-	handler:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-	handler:RegisterEvent("UNIT_AURA")
-	handler:RegisterEvent("UNIT_POWER")
-	handler:RegisterEvent("UNIT_MAXPOWER")
-	--handler:RegisterEvent("UNIT_SPELLCAST_SENT")
-	--handler:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-	--handler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-	handler:RegisterEvent("UNIT_HEALTH_FREQUENT")
-	handler:RegisterEvent("UNIT_CONNECTION")
-
-	ForEachUnitframe(UpdateFrameButtonsAttributes)
-	ForEachUnitframe(UpdateFrameDebuffsPosition)
-	ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
-end
-
-local healiumEventHandler = CreateFrame("Frame")
-healiumEventHandler:RegisterEvent("PLAYER_ENTERING_WORLD")
-healiumEventHandler:RegisterEvent("ADDON_LOADED")
-healiumEventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
-healiumEventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
-healiumEventHandler:RegisterEvent("PLAYER_REGEN_ENABLED")
-healiumEventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
-healiumEventHandler:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-healiumEventHandler:RegisterEvent("UNIT_AURA")
-healiumEventHandler:RegisterEvent("UNIT_POWER")
-healiumEventHandler:RegisterEvent("UNIT_MAXPOWER")
-healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_SENT")
-healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-healiumEventHandler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-healiumEventHandler:RegisterEvent("UNIT_HEALTH_FREQUENT")
-healiumEventHandler:RegisterEvent("UNIT_CONNECTION")
-healiumEventHandler:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
-	--DEBUG(1000,"Event: "..event)
-	PerformanceCounter:Increment(ADDON_NAME, event)
-
-	if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
-		self:UnregisterEvent("ADDON_LOADED")
-		-- local version = GetAddOnMetadata(ADDON_NAME, "version")
-		-- if version then
-			-- Message(string.format(L.GREETING_VERSION, tostring(version)))
-		-- else
-			-- Message(L.GREETING_VERSIONUNKNOWN)
-		-- end
-		-- Message(L.GREETING_OPTIONS)
-		InitializeSettings()
-	elseif event == "PLAYER_ENTERING_WORLD" then
-		GetSpecSettings()
-		CheckSpellSettings()
-		ForEachUnitframe(UpdateFrameButtonsAttributes)
-		ForEachUnitframe(UpdateFrameDebuffsPosition)
-		ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
-	elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
-		GetSpecSettings()
-		ForEachUnitframe(UpdateFrameButtonsAttributes)
-		ForEachUnitframe(UpdateFrameDebuffsPosition)
-		ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
-	elseif event == "PLAYER_REGEN_ENABLED" then
-		local created = CreateDelayedButtons()
-		if created then
-			GetSpecSettings()
-			ForEachUnitframe(UpdateFrameButtonsAttributes)
-			ForEachUnitframe(UpdateFrameDebuffsPosition)
-			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
-		end
-	elseif event == "UNIT_SPELLCAST_SENT" and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
-		--DEBUG(1, "Respec started")
-		self.hRespecing = 1 -- respec started
-	elseif (event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_SUCCEEDED") and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
-		--DEBUG(1, "Respec stopped")
-		self.hRespecing = nil --> respec stopped
-	elseif event == "PLAYER_TALENT_UPDATE" then
-		if self.hRespecing == 2 then -- respec finished
-			--DEBUG(1, "Respec finished")
-			ResetSpecSettings()
-			GetSpecSettings()
-			CheckSpellSettings()
-			ForEachUnitframe(UpdateFrameButtonsAttributes, SpecSettings)
-			ForEachUnitframe(UpdateFrameDebuffsPosition, SpecSettings)
-			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs, SpecSettings)
-			self.hRespecing = nil -- no respec running
-		elseif self.hRespecing == 1 then -- respec not yet finished
-			--DEBUG(1, "Respec not yet finished")
-			self.hRespecing = 2 -- respec finished
-		else -- respec = nil, not respecing (called while connecting)
-			--DEBUG(1, "no Respec")
-			GetSpecSettings()
-			ForEachUnitframe(UpdateFrameButtonsAttributes)
-			ForEachUnitframe(UpdateFrameDebuffsPosition)
-			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
-		end
-	elseif event == "SPELL_UPDATE_COOLDOWN" then
-		GetSpecSettings()
-		if SpecSettings then UpdateCooldowns() end
-	elseif event == "UNIT_AURA" then
-		GetSpecSettings()
-		if SpecSettings then
-			ForEachUnitframeWithUnit(arg1, UpdateFrameBuffsDebuffsPrereqs)
-		end
-	elseif (event == "UNIT_POWER" or event == "UNIT_MAXPOWER") and arg1 == "player" then
-		if C.general.showOOM then
-			GetSpecSettings()
-			if SpecSettings then
-				UpdateOOMSpells()
-			end
-		end
-	elseif event == "UNIT_CONNECTION" or event == "UNIT_HEALTH_FREQUENT" then
-		GetSpecSettings()
-		ForEachUnitframeWithUnit(arg1, UpdateFrameDisableStatus)
-	end
-end)
-
-if C.general.showOOR then
-	healiumEventHandler.hTimeSinceLastUpdate = GetTime()
-	healiumEventHandler:SetScript("OnUpdate", function (self, elapsed)
-		self.hTimeSinceLastUpdate = self.hTimeSinceLastUpdate + elapsed
-		if self.hTimeSinceLastUpdate > UpdateDelay then
-			--GetSpecSettings()
-			if SpecSettings then
-				UpdateOORSpells()
-			end
-			self.hTimeSinceLastUpdate = 0
-		end
-	end)
+	return true
 end
 
 -------------------------------------------------------
@@ -1319,4 +1241,214 @@ function H:DumpInformation(onlyShown)
 		end
 	)
 	return infos
+end
+
+-------------------------------------------------------
+-- Events handler
+-------------------------------------------------------
+-- local function DisableHealium(handler)
+	-- handler.hRespecing = nil
+	-- handler:UnregisterAllEvents()
+	-- handler:RegisterEvent("PLAYER_TALENT_UPDATE")
+	-- ForEachUnitframeEvenIfInvalid(
+		-- function(frame)
+			-- -- disable buttons
+			-- if frame.hButtons then
+				-- for i = 1, C.general.maxButtonCount, 1 do
+					-- local button = frame.hButtons[i]
+					-- button.hInvalid = true
+					-- button.hSpellBookID = nil
+					-- button.hMacroName = nil
+					-- button.texture:SetTexture("")
+					-- button:Hide()
+				-- end
+			-- end
+			-- -- disable buffs
+			-- if frame.hBuffs then
+				-- for i = 1, C.general.maxBuffCount, 1 do
+					-- local buff = frame.hBuffs[i]
+					-- buff.Hide()
+				-- end
+			-- end
+			-- -- disable debuffs
+			-- if frame.hDebuffs then
+				-- for i = 1, C.general.maxDebuffCount, 1 do
+					-- local debuff = frame.hDebuffs[i]
+					-- debuff.Hide()
+				-- end
+			-- end
+		-- end
+	-- )
+-- end
+
+-- local function EnableHealium(handler)
+	-- handler:RegisterEvent("RAID_ROSTER_UPDATE")
+	-- handler:RegisterEvent("PARTY_MEMBERS_CHANGED")
+	-- handler:RegisterEvent("PLAYER_REGEN_ENABLED")
+	-- handler:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+	-- handler:RegisterEvent("UNIT_AURA")
+	-- handler:RegisterEvent("UNIT_POWER")
+	-- handler:RegisterEvent("UNIT_MAXPOWER")
+	-- --handler:RegisterEvent("UNIT_SPELLCAST_SENT")
+	-- --handler:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+	-- --handler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+	-- handler:RegisterEvent("UNIT_HEALTH_FREQUENT")
+	-- handler:RegisterEvent("UNIT_CONNECTION")
+
+	-- ForEachUnitframe(UpdateFrameButtonsAttributes)
+	-- ForEachUnitframe(UpdateFrameDebuffsPosition)
+	-- ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+-- end
+
+function OnEvent(self, event, arg1, arg2, arg3)
+	--H:DEBUG(1000,"Event: "..event.."  "..tostring(arg1).."  "..tostring(arg2).."  "..tostring(arg3))
+	--PerformanceCounter:Increment(ADDON_NAME, event)
+
+	if event == "PLAYER_ENTERING_WORLD" then
+		GetSpecSettings()
+		CheckSpellSettings()
+		UpdateCooldowns()
+		ForEachUnitframe(UpdateFrameButtonsAttributes)
+		ForEachUnitframe(UpdateFrameDebuffsPosition)
+		ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+	elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+		GetSpecSettings()
+		ForEachUnitframe(UpdateFrameButtonsAttributes)
+		ForEachUnitframe(UpdateFrameDebuffsPosition)
+		ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		local created = CreateDelayedButtons()
+		if created then
+			GetSpecSettings()
+			ForEachUnitframe(UpdateFrameButtonsAttributes)
+			ForEachUnitframe(UpdateFrameDebuffsPosition)
+			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+		end
+	elseif event == "UNIT_SPELLCAST_SENT" and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
+		--H:DEBUG(1, "Respec started")
+		self.hRespecing = 1 -- respec started
+	elseif (event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_SUCCEEDED") and arg1 == "player" and (arg2 == ActivatePrimarySpecSpellName or arg2 == ActivateSecondarySpecSpellName) then
+		--H:DEBUG(1, "Respec stopped")
+		self.hRespecing = nil --> respec stopped
+	elseif event == "PLAYER_TALENT_UPDATE" then
+		if self.hRespecing == 2 then -- respec finished
+			--H:DEBUG(1, "Respec finished")
+			ResetSpecSettings()
+			GetSpecSettings()
+			CheckSpellSettings()
+			UpdateCooldowns()
+			ForEachUnitframe(UpdateFrameButtonsAttributes, SpecSettings)
+			ForEachUnitframe(UpdateFrameDebuffsPosition, SpecSettings)
+			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs, SpecSettings)
+			self.hRespecing = nil -- no respec running
+		elseif self.hRespecing == 1 then -- respec not yet finished
+			--H:DEBUG(1, "Respec not yet finished")
+			self.hRespecing = 2 -- respec finished
+		else -- respec = nil, not respecing (called while connecting)
+			--H:DEBUG(1, "no Respec")
+			GetSpecSettings()
+			UpdateCooldowns()
+			ForEachUnitframe(UpdateFrameButtonsAttributes)
+			ForEachUnitframe(UpdateFrameDebuffsPosition)
+			ForEachUnitframe(UpdateFrameBuffsDebuffsPrereqs)
+		end
+	elseif event == "SPELL_UPDATE_COOLDOWN" then
+		GetSpecSettings()
+		if SpecSettings then
+			PerformanceCounter:Increment(ADDON_NAME, "UpdateCooldowns")
+			UpdateCooldowns()
+		end
+	elseif event == "UNIT_AURA" then
+		GetSpecSettings()
+		if SpecSettings then
+			ForEachUnitframeWithUnit(arg1, UpdateFrameBuffsDebuffsPrereqs)
+		end
+	elseif (event == "UNIT_POWER" or event == "UNIT_MAXPOWER") and arg1 == "player" then
+		local timeSpan = GetTime() - self.hTimeSinceLastOOM
+		if timeSpan > UpdateDelay then
+			if C.general.showOOM then
+				--H:DEBUG(1, "Keeping UpdateOOMSpells: " .. tostring(timeSpan))
+				GetSpecSettings()
+				if SpecSettings then
+					PerformanceCounter:Increment(ADDON_NAME, "UpdateOOMSpells")
+					UpdateOOMSpells()
+				end
+			end
+			self.hTimeSinceLastOOM = GetTime()
+		else
+			-- H:DEBUG(1, "Skipping UpdateOOMSpells: " .. tostring(timeSpan))
+			PerformanceCounter:Increment(ADDON_NAME, "SKIP UpdateOOMSpells")
+		end
+	elseif event == "UNIT_CONNECTION" or event == "UNIT_HEALTH_FREQUENT" then
+		GetSpecSettings()
+		ForEachUnitframeWithUnit(arg1, UpdateFrameDisableStatus)
+	end
+end
+
+local function OnUpdate(self, elapsed)
+	self.hTimeSinceLastUpdate = self.hTimeSinceLastUpdate + elapsed
+	if self.hTimeSinceLastUpdate > UpdateDelay then
+		if C.general.showOOR then
+			if SpecSettings then
+				UpdateOORSpells()
+			end
+		end
+		self.hTimeSinceLastUpdate = 0
+	end
+end
+
+-------------------------------------------------------
+-- Initialize
+-------------------------------------------------------
+function H:Initialize(config)
+	if HealiumInitialized then return end
+	HealiumInitialized = true
+
+	-- Merge parameter config with Healium config
+	if config then
+		for key, value in pairs(config) do
+			if C[key] then -- found in Healium config
+				DEBUG(1, "Merging config "..tostring(key))
+				if type(value) == "table" then
+					for subKey, subValue in pairs(value) do
+						if C[key][subKey] ~= nil then
+							DEBUG(1, "Overriding "..tostring(subKey).."->"..tostring(C[key][subKey]).." with "..tostring(subValue))
+							C[key][subKey] = DeepCopy(subValue)
+						else
+							DEBUG(1, "Copying "..tostring(subKey).."->"..tostring(subValue))
+							C[key][subKey] = DeepCopy(subValue)
+						end
+					end
+				else
+					DEBUG(1, "Overriding "..tostring(key).."->"..tostring(C[key]).." with "..tostring(value))
+					C[key] = DeepCopy(value) -- should never happens
+				end
+			end
+		end
+	end
+
+	-- Initialize settings
+	InitializeSettings()
+
+	-- Create event handler
+	local eventsHandler = CreateFrame("Frame")
+	eventsHandler.hTimeSinceLastOOM = GetTime()
+	eventsHandler:RegisterEvent("PLAYER_ENTERING_WORLD")
+	eventsHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+	eventsHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
+	eventsHandler:RegisterEvent("PLAYER_REGEN_ENABLED")
+	eventsHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
+	eventsHandler:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+	eventsHandler:RegisterEvent("UNIT_AURA")
+	eventsHandler:RegisterEvent("UNIT_POWER")
+	eventsHandler:RegisterEvent("UNIT_MAXPOWER")
+	eventsHandler:RegisterEvent("UNIT_SPELLCAST_SENT")
+	eventsHandler:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+	eventsHandler:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+	eventsHandler:RegisterEvent("UNIT_HEALTH_FREQUENT")
+	eventsHandler:RegisterEvent("UNIT_CONNECTION")
+	eventsHandler:SetScript("OnEvent", OnEvent)
+
+	eventsHandler.hTimeSinceLastUpdate = GetTime()
+	eventsHandler:SetScript("OnUpdate", OnUpdate)
 end

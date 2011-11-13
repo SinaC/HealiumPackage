@@ -21,8 +21,8 @@ C["PALADIN"] = {
 			{ spellID = 19750 }, -- Flash of Light
 			{ spellID = 635 }, -- Holy Light
 			{ spellID = 82326 }, -- Divine Light
-			{ spellID = 633 }, -- Lay on Hands
-			{ spellID = 1022 }, -- Hand of Protection
+			{ spellID = 633, debuffs = { 25771 } }, -- Lay on Hands (not if affected by Forbearance)
+			{ spellID = 1022, debuffs = { 25771 } }, -- Hand of Protection (not if affected by Forbearance)
 			{ spellID = 1044 }, -- Hand of Freedom
 			{ spellID = 6940 }, -- Hand of Sacrifice
 			{ spellID = 4987, dispels = { ["Poison"] = true, ["Disease"] = true, ["Magic"] = function() return select(5, GetTalentInfo(1,14)) > 0 end } }, -- Cleanse
@@ -33,7 +33,8 @@ C["PALADIN"] = {
 		spells = {
 			{ spellID = 31789 }, -- Righteous Defense
 			{ spellID = 6940 }, -- Hand of Sacrifice
-			{ spellID = 633 }, -- Lay on Hands
+			{ spellID = 633, debuffs = { 25771 } }, -- Lay on Hands
+			{ spellID = 1022, debuffs = { 25771 } }, -- Hand of Protection (not if affected by Forbearance)
 			{ spellID = 4987, dispels = { ["Poison"] = true, ["Disease"] = true } }, -- Cleanse
 		}
 	},

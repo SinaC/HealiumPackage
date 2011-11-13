@@ -1,7 +1,7 @@
 -- Exported functions
--- H:CreateHealiumButton(parent, name, size, anchor) create a healium button (must contains cooldown)
--- H:CreateHealiumDebuff(parent, name, size, anchor) create a healium debuff (must contains icon, cooldown, count)
--- H:CreateHealiumBuff(parent, name, size, anchor) create a healium buff (must contains icon, cooldown, count)
+-- H:CreateHealiumButton(parent, name, size, anchor) create a healium button (must contain texture and cooldown)
+-- H:CreateHealiumDebuff(parent, name, size, anchor) create a healium debuff (must contain icon and may contain cooldown, count)
+-- H:CreateHealiumBuff(parent, name, size, anchor) create a healium buff (must contain icon and may contain cooldown, count)
 
 
 local H, C, L = unpack(select(2, ...))

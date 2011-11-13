@@ -11,6 +11,7 @@ local H, C, L = unpack(select(2, ...))
 -- Namespace
 H.PerformanceCounter = {}
 local PerformanceCounter = H.PerformanceCounter
+local LastReset = GetTime()
 
 -- Local variables
 local counters = {}
@@ -44,10 +45,12 @@ function PerformanceCounter:Get(addonName, fctName)
 	local addonEntry = counters[addonName]
 	if not addonEntry then return nil end
 	if not fctName then
+		local timespan = GetTime() - LastReset
 		local list = {} -- make a copy to avoid caller modifying counters
 		for key, value in pairs(addonEntry) do
 			--print(key.."->"..tostring(value.count).."  "..tostring(value.lastTime).."  "..tostring(value.lowestSpan).."  "..tostring(value.highestSpan))
-			list[key] = {count = value.count, lastTime = value.lastTime, lowestSpan = value.lowestSpan, highestSpan = value.highestSpan}
+			--list[key] = {count = value.count, lastTime = value.lastTime, lowestSpan = value.lowestSpan, highestSpan = value.highestSpan, frequency = count / timespan}
+			list[key] = {count = value.count, frequency = value.count / timespan, lowestSpan = value.lowestSpan}
 		end
 		return list
 	else
@@ -61,6 +64,7 @@ function PerformanceCounter:Get(addonName, fctName)
 end
 
 function PerformanceCounter:Reset(addonName)
+	LastReset = GetTime()
 	if not addonName then
 		for addon, _ in pairs(counters) do
 			Reset(addon)

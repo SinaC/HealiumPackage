@@ -4,6 +4,8 @@
 -- Get Healium Components
 local H = unpack(HealiumCore)
 
+H:Initialize()
+
 -- Tags
 local function utf8sub(string, i, dots)
 	if not string then return end
@@ -207,7 +209,7 @@ local function Shared(self, unit)
 		}
 	end
 
-	H:AddHealiumComponents(self)
+	H:RegisterFrame(self)
 
 	return self
 end
@@ -274,7 +276,8 @@ oUF:Factory(function(self)
 
 	if Healium_oUF_Config.showTanks then
 		-- Tank frame (attributes: [["groupFilter", "MAINTANK,TANK"]],  [["groupBy", "ROLE"]],    showParty, showRaid but not showSolo)
-		TankRaidHeader = self:SpawnHeader("oUF_HealiumRaidTank0125", nil, Visibilityl25,
+		--TankRaidHeader = self:SpawnHeader("oUF_HealiumRaidTank0125", nil, Visibility25,
+		TankRaidHeader = self:SpawnHeader("oUF_HealiumRaidTank0125", nil, "raid, party",
 			'oUF-initialConfigFunction', [[
 				local header = self:GetParent()
 				self:SetWidth(header:GetAttribute('initial-width'))
@@ -282,15 +285,28 @@ oUF:Factory(function(self)
 			]],
 			'initial-width', Healium_oUF_Config.unitframeWidth,
 			'initial-height', Healium_oUF_Config.unitframeHeight,
-			"showSolo", false,
-			"showParty", true,
+			-- "showSolo", false,
+			-- "showParty", true,
 			"showRaid", true,
-			"showPlayer", Healium_oUF_Config.showplayerinparty,
+			-- "showPlayer", Healium_oUF_Config.showplayerinparty,
 			"yOffset", -4,
-			"groupFilter", "MAINTANK,TANK",
-			"sortMethod", "NAME"
+			-- "groupFilter", "MAINTANK,TANK",
+			-- "sortMethod", "NAME"
+			"sortMethod", "NAME",
+			"groupFilter", "MAINTANK"
+			-- "showRaid", true,
+			-- "xoffset", 7,
+    		-- "yOffset", 7,
+			-- "maxColumns", 1,
+    		-- "unitsPerColumn", 5,
+			-- "columnSpacing", 7,
+			-- "point", "LEFT",
+			-- "columnAnchorPoint", "TOP",
+			-- "sortMethod", "NAME",
+			-- "groupFilter", "MAINTANK"
 		)
-		TankRaidHeader:SetPoint("BOTTOMLEFT", PlayerRaidHeader, "TOPLEFT", 0, 50)
+		--TankRaidHeader:SetPoint("BOTTOMLEFT", PlayerRaidHeader, "TOPLEFT", 0, 50)
+		TankRaidHeader:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -400, -300)
 		TankRaidHeader.hVisibilityAttribute = Visibility25
 	end
 
