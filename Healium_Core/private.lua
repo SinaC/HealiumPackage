@@ -24,8 +24,12 @@ function Private.DEBUG(lvl, ...)
 		local line = "|CFF00FF00HC|r:" .. strjoin(" ", ...)
 		if tekDebugFrame then
 			tekDebugFrame:AddMessage(line)
-		else
-			print(line)
+		-- else
+			-- print(line)
 		end
 	end
+end
+
+if not tekDebugFrame and C.general.debug then
+	WARNING("tekDebug not found, debug output sent to chat") -- TODO: localization
 end

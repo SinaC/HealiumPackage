@@ -7,7 +7,7 @@ local H, C, L = unpack(select(2,...))
 -- debuff frame border highlight
 -- frame background
 
---if true then return end
+if true then return end
 
 local FlashFrame = H.FlashFrame
 local Private = ns.Private

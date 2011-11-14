@@ -540,7 +540,8 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 					-- is buff casted by player and in spell list?
 					local found = false
 					for index, spellSetting in ipairs(SpecSettings.spells) do
-						if spellSetting.spellID and spellSetting.spellID == spellID then
+						--if spellSetting.spellID and spellSetting.spellID == spellID then
+						if spellSetting.spellName and spellSetting.spellName == name then
 							found = true
 							break
 						elseif spellSetting.macroName then
