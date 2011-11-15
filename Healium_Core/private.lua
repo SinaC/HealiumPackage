@@ -11,7 +11,7 @@ function Private.ERROR(...)
 end
 
 function Private.WARNING(...)
-	local line = "|CFF00FFFFHealiumCore|r:" .. strjoin(" ", ...)
+	local line = "|CFFFFFF00HealiumCore|r:" .. strjoin(" ", ...)
 	print(line)
 end
 

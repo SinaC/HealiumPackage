@@ -107,17 +107,21 @@ local function CheckSpellSettings()
 	--H:DEBUG(1000,"CheckSpellSettings")
 	-- Check settings
 	if SpecSettings then
-		for _, spellSetting in ipairs(SpecSettings.spells) do
-			--H:DEBUG(1,"CheckSpellSettings:"..tostring(spellSetting.spellID).."  "..tostring(spellSetting.macroName))
-			if spellSetting.spellID and not IsSpellLearned(spellSetting.spellID) then
-				local name = GetSpellInfo(spellSetting.spellID)
-				if name then
-					ERROR(string.format(L.CHECKSPELL_SPELLNOTLEARNED, name, spellSetting.spellID))
-				else
-					ERROR(string.format(L.CHECKSPELL_SPELLNOTEXISTS, spellSetting.spellID))
+		if not SpecSettings.spells then
+			WARNING("No spells found for current spec")
+		else
+			for _, spellSetting in ipairs(SpecSettings.spells) do
+				--H:DEBUG(1,"CheckSpellSettings:"..tostring(spellSetting.spellID).."  "..tostring(spellSetting.macroName))
+				if spellSetting.spellID and not IsSpellLearned(spellSetting.spellID) then
+					local name = GetSpellInfo(spellSetting.spellID)
+					if name then
+						ERROR(string.format(L.CHECKSPELL_SPELLNOTLEARNED, name, spellSetting.spellID))
+					else
+						ERROR(string.format(L.CHECKSPELL_SPELLNOTEXISTS, spellSetting.spellID))
+					end
+				elseif spellSetting.macroName and GetMacroIndexByName(spellSetting.macroName) == 0 then
+					ERROR(string.format(L.CHECKSPELL_MACRONOTFOUND, spellSetting.macroName))
 				end
-			elseif spellSetting.macroName and GetMacroIndexByName(spellSetting.macroName) == 0 then
-				ERROR(string.format(L.CHECKSPELL_MACRONOTFOUND, spellSetting.macroName))
 			end
 		end
 	end
@@ -214,10 +218,12 @@ local function InitializeSettings()
 	-- Add spellName to spell list
 	if C[H.myclass] then
 		for _, specSetting in pairs(C[H.myclass]) do
-			for _, spellSetting in ipairs(specSetting.spells) do
-				if spellSetting.spellID then
-					local spellName = GetSpellInfo(spellSetting.spellID)
-					spellSetting.spellName = spellName
+			if specSetting.spells then
+				for _, spellSetting in ipairs(specSetting.spells) do
+					if spellSetting.spellID then
+						local spellName = GetSpellInfo(spellSetting.spellID)
+						spellSetting.spellName = spellName
+					end
 				end
 			end
 		end
@@ -489,7 +495,7 @@ end
 local function UpdateFrameButtonsColor(frame)
 	PerformanceCounter:Increment(ADDON_NAME, "UpdateFrameButtonsColor")
 	if not frame.hButtons then return end
-	if not SpecSettings then return end
+	if not SpecSettings or not SpecSettings.spells then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local button = frame.hButtons[index]
 		if button then
@@ -529,7 +535,7 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 	local buffCount = 0
 	if not frame.hDisabled then
 		local buffIndex = 1
-		if SpecSettings then
+		if SpecSettings and SpecSettings.spells then
 			for i = 1, 40, 1 do
 				-- get buff, don't filter on PLAYER because we need a full list of buff to check prereq
 				local name, _, icon, count, _, duration, expirationTime, unitCaster, _, _, spellID = UnitBuff(unit, i)
@@ -579,7 +585,7 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 	local debuffCount = 0
 	local debuffIndex = 1
 	local dispellableFound = false
-	if SpecSettings or C.general.showDebuff then
+	if (SpecSettings and SpecSettings.spells) or C.general.showDebuff then
 		for i = 1, 40, 1 do
 			-- get debuff
 			local name, _, icon, count, debuffType, duration, expirationTime, _, _, _, spellID = UnitDebuff(unit, i)
@@ -660,7 +666,7 @@ local function UpdateFrameBuffsDebuffsPrereqs(frame)
 	--H:DEBUG(1000,"BUFF:"..buffCount.."  DEBUFF:"..debuffCount)
 
 	-- color dispel button if dispellable debuff (and not in dispellable filter list) + prereqs management (is buff or debuff a prereq to enable/disable a spell)
-	if SpecSettings and frame.hButtons and not frame.hDisabled then
+	if SpecSettings and SpecSettings.spells and frame.hButtons and not frame.hDisabled then
 		local isUnitInRange = UnitInRange(unit)
 		local highlightDispel = Getter(C.general.highlightDispel, true)
 		local playSound = false -- play sound only if at least one debuff dispellable not filtered and option activated
@@ -814,7 +820,7 @@ local lastCD = {} -- keep a list of CD between calls, if CD information are the 
 local function UpdateCooldowns()
 	--PerformanceCounter:Increment(ADDON_NAME, "UpdateCooldowns")
 	--H:DEBUG(1000,"UpdateCooldowns")
-	if not SpecSettings then return end
+	if not SpecSettings or not SpecSettings.spells then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local start, duration, enabled
 		if spellSetting.spellID then
@@ -850,7 +856,7 @@ local lastOOM = {} -- keep OOM status of previous step, if no change, no need to
 local function UpdateOOMSpells()
 	--PerformanceCounter:Increment(ADDON_NAME, "UpdateOOMSpells")
 	--H:DEBUG(1000,"UpdateOOMSpells")
-	if not SpecSettings then return end
+	if not SpecSettings or not SpecSettings.spells then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local spellName = spellSetting.spellName -- spellName is automatically set if spellID was found in settings
 		if spellSetting.macroName then
@@ -878,7 +884,7 @@ end
 local function UpdateOORSpells()
 	PerformanceCounter:Increment(ADDON_NAME, "UpdateOORSpells")
 	--H:DEBUG(1000,"UpdateOORSpells")
-	if not SpecSettings then return end
+	if not SpecSettings or not SpecSettings.spells then return end
 	for index, spellSetting in ipairs(SpecSettings.spells) do
 		local spellName = spellSetting.spellName -- spellName is automatically set if spellID was found in settings
 		if spellSetting.macroName then
@@ -901,7 +907,7 @@ local function UpdateFrameDebuffsPosition(frame)
 	--H:DEBUG(1000,"UpdateFrameDebuffsPosition")
 	--H:DEBUG(1000,"Update debuff position for "..frame:GetName())
 	local anchor = frame
-	if SpecSettings then -- if no heal buttons, anchor to unitframe
+	if SpecSettings and SpecSettings.spells then -- if no heal buttons, anchor to unitframe
 		anchor = frame.hButtons[#SpecSettings.spells]
 	end
 	--H:DEBUG(1000,"Update debuff position for "..frame:GetName().." anchoring on "..anchor:GetName())
@@ -920,7 +926,7 @@ local function UpdateFrameButtonsAttributes(frame)
 	if not frame.hButtons then return end
 	for i, button in ipairs(frame.hButtons) do
 		--H:DEBUG(1000,"UpdateFrameButtonsAttributes:"..tostring(SpecSettings))--.."  "..(SpecSettings and SpecSettings.spells and tostring(#SpecSettings.spells) or "nil").."  "..i)
-		if SpecSettings and i <= #SpecSettings.spells then
+		if SpecSettings and SpecSettings.spells and i <= #SpecSettings.spells then
 			local spellSetting = SpecSettings.spells[i]
 			local icon, name, type
 			if spellSetting.spellID then
