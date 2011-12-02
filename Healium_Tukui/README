@@ -1,4 +1,7 @@
-Version 1.4  TO COMMIT
+Version 1.5
+TOC update for patch 4.3
+
+Version 1.4
 AddHealiumComponents in Core renamed to RegisterFrame
 Healium initialization added
 Bugs fixed: dump perf, dump show, TabMenu dropdown 

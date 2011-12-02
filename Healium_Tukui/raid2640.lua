@@ -12,7 +12,7 @@ local T, C, L = unpack(Tukui) -- Import: T - functions, constants, variables; C 
 if not C["unitframes"].enable == true then return end
 
 local function Shared(self, unit)
-	self.colors = T.oUF_colors
+	self.colors = T.UnitColor or T.oUF_colors
 	self:RegisterForClicks("AnyUp")
 	self:SetScript('OnEnter', UnitFrame_OnEnter)
 	self:SetScript('OnLeave', UnitFrame_OnLeave)

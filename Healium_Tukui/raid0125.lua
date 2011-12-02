@@ -168,7 +168,7 @@ local backdrop = {
 local function Shared(self, unit)
 	--print("Shared: "..(unit or "nil").."  "..self:GetName())
 
-	self.colors = T.oUF_colors
+	self.colors = T.UnitColor or T.oUF_colors
 	self:RegisterForClicks("AnyUp")
 	self:SetScript('OnEnter', UnitFrame_OnEnter)
 	self:SetScript('OnLeave', UnitFrame_OnLeave)
