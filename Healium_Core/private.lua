@@ -31,5 +31,5 @@ function Private.DEBUG(lvl, ...)
 end
 
 if not tekDebugFrame then --and C.general.debug then
-	WARNING("tekDebug not found, debug output sent to chat") -- TODO: localization
+	Private:WARNING("tekDebug not found, debug output sent to chat") -- TODO: localization
 end
